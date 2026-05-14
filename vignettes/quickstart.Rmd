@@ -1,0 +1,106 @@
+---
+title: "Strand Platform Quickstart"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Strand Platform Quickstart}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+This vignette walks end-to-end through the [Strand Platform](https://strandai.com)
+API using the `strand` R package: upload a Whole Slide Image (WSI), submit a
+POSTMAN H&E to multiplex protein inference job, wait for completion, and pull
+results back as a `SpatialExperiment`.
+
+> The chunks below set `eval = FALSE` so the vignette renders cleanly on CRAN
+> without network access. To run them yourself, mint an API key at
+> `app.strandai.com/settings/api-keys`, set `STRAND_API_KEY`, and run
+> interactively.
+
+## 1. Set up
+
+```{r}
+library(strandai)
+
+# Reads STRAND_API_KEY; for local development:
+# Sys.setenv(STRAND_BASE_URL = "http://localhost:3000")
+client <- strand_client()
+client
+```
+
+## 2. Upload a slide
+
+`strand_upload_file()` handles the resumable upload flow end-to-end: it
+initiates a session, streams the file to GCS in 8 MiB chunks, and finalizes
+once all bytes are written. Slide dimensions are read on finalize and used to
+estimate credits.
+
+```{r}
+upload <- strand_upload_file(client, "slide.svs", progress = TRUE)
+upload
+```
+
+## 3. Estimate credits
+
+Estimation is free — call it as many times as you like while iterating on a
+marker panel.
+
+```{r}
+markers <- c("CD3", "CD8", "Ki67", "PD-L1")
+est <- strand_estimate(client, upload$id, markers)
+message(
+  est$patch_count, " patches x ", est$marker_count, " markers = ",
+  est$estimated_credits, " credits"
+)
+message("org balance: ", est$org_balance)
+```
+
+## 4. Submit and wait
+
+Submission **atomically reserves** the estimated credits in the same database
+transaction that creates the job. If your org has insufficient credits, you'll
+see a `strand_insufficient_credits_error`.
+
+```{r}
+job <- strand_predict(client, upload$id, markers)
+status <- strand_job_wait(job, progress = TRUE)
+stopifnot(status$status == "completed")
+```
+
+## 5. Download as SpatialExperiment
+
+`strand_download_results()` walks the OME-Zarr result store via the
+API-key-authenticated proxy and assembles the channels into a
+[`SpatialExperiment`](https://bioconductor.org/packages/SpatialExperiment).
+Rows are markers, columns are pixels; spatial coordinates are stored in
+`spatialCoords(spe)`.
+
+For very large slides, supply `path = "out/"` to mirror the zarr store to disk
+and read selectively with `Rarr` instead.
+
+```{r}
+spe <- strand_download_results(job)
+spe
+```
+
+## Error handling
+
+```{r}
+tryCatch(
+  strand_predict(client, upload$id, markers),
+  strand_insufficient_credits_error = function(e) {
+    message("Need ", e$required, " more credits.")
+  },
+  strand_rate_limit_error = function(e) {
+    message("Org over the concurrent-job cap; retry in ", e$retry_after, "s.")
+  }
+)
+```
