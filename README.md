@@ -2,6 +2,8 @@
 
 R client for the [Strand Platform](https://strandai.com) — H&E → multiplex protein inference. Functions all use the `strand_*` prefix; the package is named `strandai` to avoid a name clash with the unrelated [`strand`](https://cran.r-project.org/package=strand) package on CRAN.
 
+**Agent-friendly docs:** The full API reference is published as Markdown at [https://app.strandai.com/docs/api.md](https://app.strandai.com/docs/api.md), and the LLM index lives at [https://app.strandai.com/llms.txt](https://app.strandai.com/llms.txt).
+
 ## Install
 
 ```r
