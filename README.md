@@ -7,11 +7,11 @@ R client for the [Strand Platform](https://strandai.com) — H&E → multiplex p
 ## Install
 
 ```r
-# From r-universe (when published)
+# From r-universe (recommended):
 install.packages("strandai", repos = c("https://strand-ai.r-universe.dev", "https://cloud.r-project.org"))
 
-# Or directly from this repository (development):
-remotes::install_local("sdks/r/strand")
+# Fallback — install directly from GitHub:
+remotes::install_github("Strand-AI/strand-official", subdir = "sdks/r/strandai")
 ```
 
 To return results as `SpatialExperiment` (recommended), also install:

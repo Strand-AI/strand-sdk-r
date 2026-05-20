@@ -4,7 +4,7 @@ Title: Client for the Strand Platform API
 Version: 0.1.0
 Authors@R: c(
     person("Strand AI", role = c("aut", "cre", "cph"),
-           email = "engineering@strandai.bio"))
+           email = "support@strandai.com"))
 Description: R client for the Strand Platform 'REST' API. Provides functions to
     upload Whole Slide Images via 'GCS' resumable upload, submit 'POSTMAN' H&E
     to multiplex protein inference jobs, and download 'OME-Zarr' predictions as
