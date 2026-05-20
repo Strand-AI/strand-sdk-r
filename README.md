@@ -11,7 +11,7 @@ R client for the [Strand Platform](https://strandai.com) — H&E → multiplex p
 install.packages("strandai", repos = c("https://strand-ai.r-universe.dev", "https://cloud.r-project.org"))
 
 # Fallback — install directly from GitHub:
-remotes::install_github("Strand-AI/strand-official", subdir = "sdks/r/strandai")
+remotes::install_github("Strand-AI/strand-sdk-r")
 ```
 
 To return results as `SpatialExperiment` (recommended), also install:
@@ -111,6 +111,15 @@ R/
 tests/testthat/             unit tests using webfakes (in-process http server)
 vignettes/quickstart.Rmd
 ```
+
+## Issues & contributing
+
+This package is published from a read-only public mirror of an internal
+monorepo. File bug reports and feature requests on the mirror's issue
+tracker: [github.com/Strand-AI/strand-sdk-r/issues](https://github.com/Strand-AI/strand-sdk-r/issues).
+
+The mirror doesn't accept pull requests directly — changes land in the
+internal monorepo and are synced here automatically on every release.
 
 ## License
 

@@ -12,7 +12,8 @@ Description: R client for the Strand Platform 'REST' API. Provides functions to
     research workflows in pharma and academic labs.
 License: Apache License (>= 2)
 Encoding: UTF-8
-URL: https://strandai.com, https://app.strandai.com/docs/api
+URL: https://strandai.com, https://docs.strandai.com, https://github.com/Strand-AI/strand-sdk-r
+BugReports: https://github.com/Strand-AI/strand-sdk-r/issues
 Depends:
     R (>= 4.3)
 Imports:
