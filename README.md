@@ -22,10 +22,38 @@ BiocManager::install("SpatialExperiment")
 
 ## Quickstart
 
+One blocking call runs the full pipeline — upload, submit, wait, download:
+
 ```r
 library(strandai)
 client <- strand_client()  # reads STRAND_API_KEY
 
+result <- strand_run(
+  client, "biopsy.ome.tiff",
+  markers = c("HER2", "CD8", "PD1"),
+  output_dir = "./outputs/"
+)
+cat("Used", result$credits_used, "credits;",
+    length(result$marker_outputs), "markers written\n")
+```
+
+`strand_run()` returns a `strand_predict_result` list with `job_id`, `status`,
+`credits_used`, `marker_outputs` (one path per marker under `output_dir`),
+`output_dir`, and `job` (the underlying `strand_job` handle). A
+`predict.strand_client` S3 method also dispatches:
+
+```r
+result <- predict(client, "biopsy.ome.tiff", markers = c("HER2", "CD8"))
+```
+
+Pass `on_progress = function(stage, fraction) ...` to follow the four stages
+(`"upload"`, `"submit"`, `"wait"`, `"download"`).
+
+### Lower-level primitives
+
+The submit / wait / download steps stay exported for fine-grained control:
+
+```r
 upload <- strand_upload_file(client, "slide.svs", progress = TRUE)
 
 est <- strand_estimate(client, upload$id, c("CD3", "CD8", "Ki67"))
@@ -76,7 +104,8 @@ R/
   client.R                  strand_client + S3 print method
   http.R                    internal httr2 wrapper + typed error mapping
   uploads.R                 strand_upload_file (resumable chunked PUT to GCS)
-  predict.R                 strand_estimate + strand_predict
+  predict.R                 strand_estimate, strand_predict (submit),
+                            strand_run (full pipeline), predict.strand_client
   jobs.R                    strand_job_get + strand_job_wait
   results.R                 strand_download_results + SpatialExperiment
 tests/testthat/             unit tests using webfakes (in-process http server)

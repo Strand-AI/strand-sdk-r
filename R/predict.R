@@ -77,3 +77,127 @@ strand_coerce_markers <- function(markers) {
   }
   trimmed
 }
+
+#' Run the full prediction pipeline in one blocking call
+#'
+#' Orchestrates upload → submit → wait → (optional) download, returning when
+#' the job reaches a terminal state. All sub-operations use the same exported
+#' primitives ([strand_upload_file()], [strand_predict()], [strand_job_wait()],
+#' [strand_download_results()]) so callers can drop down a level whenever they
+#' need finer control.
+#'
+#' @param client A `strand_client`.
+#' @param image_path Path to a local WSI file (SVS / TIFF / NDPI / ...).
+#' @param markers Character vector of markers to predict (e.g.
+#'   `c("HER2", "CD8", "PD1")`).
+#' @param timeout_sec Max seconds to wait for the job to finish; defaults to 30
+#'   minutes.
+#' @param output_dir Optional output directory. When provided, the entire
+#'   OME-Zarr result store is mirrored under this directory.
+#' @param poll_interval_sec Seconds between status polls while waiting.
+#' @param on_progress Optional callback `function(stage, fraction)` where
+#'   `stage` is one of `"upload"`, `"submit"`, `"wait"`, `"download"`.
+#'
+#' @return A list with class `strand_predict_result` containing:
+#'   `job_id`, `status`, `credits_used`, `marker_outputs` (named list mapping
+#'   marker name → on-disk directory when `output_dir` is provided, else an
+#'   empty list), `output_dir`, and `job` (the underlying `strand_job` handle).
+#'
+#' @examples
+#' \dontrun{
+#' client <- strand_client()
+#' result <- strand_run(
+#'   client, "biopsy.ome.tiff",
+#'   markers = c("HER2", "CD8", "PD1"),
+#'   output_dir = "./outputs/"
+#' )
+#' cat("used", result$credits_used, "credits\n")
+#'
+#' # The S3 generic also works: predict(client, ...)
+#' result <- predict(client, "biopsy.ome.tiff", markers = c("HER2"))
+#' }
+#' @export
+strand_run <- function(client, image_path, markers,
+                       timeout_sec = 1800,
+                       output_dir = NULL,
+                       poll_interval_sec = 5,
+                       on_progress = NULL) {
+  if (!inherits(client, "strand_client")) {
+    stop("client must be a strand_client (see strand_client())", call. = FALSE)
+  }
+  validated_markers <- strand_coerce_markers(markers)
+  if (!file.exists(image_path)) {
+    stop("No such file: ", image_path, call. = FALSE)
+  }
+
+  report <- if (is.function(on_progress)) on_progress else function(stage, fraction) invisible(NULL)
+
+  report("upload", 0)
+  upload <- strand_upload_file(client, image_path)
+  report("upload", 1)
+
+  report("submit", NA_real_)
+  job <- strand_predict(client, upload$id, validated_markers)
+
+  report("wait", NA_real_)
+  status <- strand_job_wait(job,
+                            timeout = timeout_sec,
+                            poll_interval = poll_interval_sec)
+
+  marker_outputs <- list()
+  out_dir <- NULL
+  if (!is.null(output_dir)) {
+    report("download", 0)
+    out_dir <- output_dir
+    strand_download_results(job, path = out_dir)
+    for (m in validated_markers) {
+      marker_outputs[[m]] <- file.path(out_dir, "markers", m)
+    }
+    report("download", 1)
+  }
+
+  structure(
+    list(
+      job_id = job$id,
+      status = status$status,
+      credits_used = job$reserved_credits %||% 0L,
+      marker_outputs = marker_outputs,
+      output_dir = out_dir,
+      job = job
+    ),
+    class = "strand_predict_result"
+  )
+}
+
+#' @export
+print.strand_predict_result <- function(x, ...) {
+  cat("<strand_predict_result>\n")
+  cat("  job_id:       ", x$job_id, "\n", sep = "")
+  cat("  status:       ", x$status, "\n", sep = "")
+  cat("  credits_used: ", x$credits_used, "\n", sep = "")
+  if (!is.null(x$output_dir)) {
+    cat("  output_dir:   ", x$output_dir, "\n", sep = "")
+  }
+  if (length(x$marker_outputs) > 0L) {
+    cat("  markers:      ", paste(names(x$marker_outputs), collapse = ", "), "\n", sep = "")
+  }
+  invisible(x)
+}
+
+#' Run a prediction via the `stats::predict` generic
+#'
+#' Dispatches `predict(client, image_path, markers, ...)` to [strand_run()],
+#' so the standard R generic works on a `strand_client`. See [strand_run()]
+#' for the full argument list and return shape.
+#'
+#' @param object A `strand_client`.
+#' @param image_path Path to a local WSI file.
+#' @param markers Character vector of markers to predict.
+#' @param ... Additional arguments passed to [strand_run()] (e.g.
+#'   `timeout_sec`, `output_dir`, `poll_interval_sec`, `on_progress`).
+#'
+#' @return A `strand_predict_result` list; see [strand_run()].
+#' @exportS3Method stats::predict
+predict.strand_client <- function(object, image_path, markers, ...) {
+  strand_run(object, image_path, markers, ...)
+}
