@@ -4,7 +4,7 @@
 \alias{strand_predict}
 \title{Submit a prediction job}
 \usage{
-strand_predict(client, upload_id, markers)
+strand_predict(client, upload_id, markers, model = NULL)
 }
 \arguments{
 \item{client}{A \code{strand_client}.}
@@ -12,6 +12,12 @@ strand_predict(client, upload_id, markers)
 \item{upload_id}{Upload identifier (from \code{\link[=strand_upload_file]{strand_upload_file()}}).}
 
 \item{markers}{Character vector of marker names (e.g. \code{c("CD3", "CD8")}).}
+
+\item{model}{Optional explicit model id. Currently \code{"v10"} (the original
+7-marker panel) or \code{"v10-fullpanel"} (the 192-marker sibling). When \code{NULL}
+(default), the platform picks. The two models share GenePT weights — a
+marker request against the wrong endpoint is just a model-weights swap,
+not a different vocab.}
 }
 \value{
 A \code{strand_job} list with \code{id}, \code{reserved_credits}, \code{client}.
@@ -25,5 +31,9 @@ condition with a \code{required} field.
 \dontrun{
 job <- strand_predict(client, upload$id, c("CD3", "CD8"))
 strand_job_wait(job)
+
+# Explicitly target the full 192-marker panel:
+job <- strand_predict(client, upload$id, c("CD3", "CD8"),
+                      model = "v10-fullpanel")
 }
 }

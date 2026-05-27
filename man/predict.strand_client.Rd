@@ -13,14 +13,16 @@
 
 \item{markers}{Character vector of markers to predict.}
 
-\item{...}{Additional arguments passed to \code{\link[=strand_run]{strand_run()}} (e.g.
-\code{timeout_sec}, \code{output_dir}, \code{poll_interval_sec}, \code{on_progress}).}
+\item{...}{Additional arguments passed to \code{\link[=strand_run]{strand_run()}} (e.g. \code{model},
+\code{wait}, \code{timeout_sec}, \code{output_dir}, \code{poll_interval_sec}, \code{on_progress}).}
 }
 \value{
-A \code{strand_predict_result} list; see \code{\link[=strand_run]{strand_run()}}.
+A \code{strand_predict_result} list when \code{wait = TRUE}, or a
+\code{strand_job} handle when \code{wait = FALSE}; see \code{\link[=strand_run]{strand_run()}}.
 }
 \description{
 Dispatches \code{predict(client, image_path, markers, ...)} to \code{\link[=strand_run]{strand_run()}},
 so the standard R generic works on a \code{strand_client}. See \code{\link[=strand_run]{strand_run()}}
-for the full argument list and return shape.
+for the full argument list and return shape — \verb{model =} and \verb{wait =} are
+both forwarded.
 }

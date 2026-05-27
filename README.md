@@ -49,6 +49,46 @@ result <- predict(client, "biopsy.ome.tiff", markers = c("HER2", "CD8"))
 Pass `on_progress = function(stage, fraction) ...` to follow the four stages
 (`"upload"`, `"submit"`, `"wait"`, `"download"`).
 
+### Fire-and-forget: `wait = FALSE`
+
+A full pipeline run blocks for 15+ minutes. To kick a job off and continue
+with other work, pass `wait = FALSE` — `strand_run()` returns the
+`strand_job` handle as soon as upload + submit complete:
+
+```r
+job <- strand_run(client, "slide.svs", c("CD3", "CD8"), wait = FALSE)
+message("submitted ", job$id)
+
+# ...do other work, or shut down the process — the job runs server-side.
+
+# Later (same process or a fresh one via `strand_job_get(client, job$id)`):
+status <- strand_job_wait(job)
+spe <- strand_download_results(job)
+```
+
+When `wait = FALSE`, the `"wait"` and `"download"` progress stages don't fire,
+and `timeout_sec` / `poll_interval_sec` / `output_dir` are ignored.
+
+### Choosing a model
+
+`strand_predict()` and `strand_run()` accept an optional `model =`. Today the
+SDK routes to two siblings of the POSTMAN v10 family:
+
+- `"v10"` — original 7-marker panel (smaller, faster).
+- `"v10-fullpanel"` — 192-marker panel (broader coverage).
+
+Both share the same GenePT embeddings, so the marker vocabulary is identical
+— picking a model is a model-weights swap, not a vocab swap. Omitting `model`
+(or `NULL`) lets the platform pick the default (currently `v10-fullpanel`).
+
+```r
+result <- strand_run(
+  client, "slide.svs",
+  markers = c("CD8", "Ki67", "PanCK"),
+  model = "v10-fullpanel"
+)
+```
+
 ### Lower-level primitives
 
 The submit / wait / download steps stay exported for fine-grained control:

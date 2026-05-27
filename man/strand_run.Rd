@@ -2,12 +2,14 @@
 % Please edit documentation in R/predict.R
 \name{strand_run}
 \alias{strand_run}
-\title{Run the full prediction pipeline in one blocking call}
+\title{Run the full prediction pipeline in one call}
 \usage{
 strand_run(
   client,
   image_path,
   markers,
+  model = NULL,
+  wait = TRUE,
   timeout_sec = 1800,
   output_dir = NULL,
   poll_interval_sec = 5,
@@ -22,6 +24,15 @@ strand_run(
 \item{markers}{Character vector of markers to predict (e.g.
 \code{c("HER2", "CD8", "PD1")}).}
 
+\item{model}{Optional explicit model id; see \code{\link[=strand_predict]{strand_predict()}}. Defaults
+to \code{NULL} (platform picks).}
+
+\item{wait}{When \code{TRUE} (default), block through upload → submit → wait →
+download and return a \code{strand_predict_result}. When \code{FALSE}, return the
+\code{strand_job} handle once upload + submit complete. \code{timeout_sec},
+\code{poll_interval_sec}, \code{output_dir}, and the \code{"wait"} / \code{"download"}
+progress stages are ignored when \code{wait = FALSE}.}
+
 \item{timeout_sec}{Max seconds to wait for the job to finish; defaults to 30
 minutes.}
 
@@ -31,20 +42,25 @@ OME-Zarr result store is mirrored under this directory.}
 \item{poll_interval_sec}{Seconds between status polls while waiting.}
 
 \item{on_progress}{Optional callback \verb{function(stage, fraction)} where
-\code{stage} is one of \code{"upload"}, \code{"submit"}, \code{"wait"}, \code{"download"}.
-\code{fraction} is always a numeric in \verb{[0, 1]} — \code{0} at the start of each
-stage and \code{1} at its end, with intermediate values where the underlying
-step exposes progress.}
+\code{stage} is one of \code{"upload"}, \code{"submit"}, \code{"wait"}, \code{"download"} (only
+\code{"upload"} and \code{"submit"} fire when \code{wait = FALSE}). \code{fraction} is always
+a numeric in \verb{[0, 1]} — \code{0} at the start of each stage and \code{1} at its end,
+with intermediate values where the underlying step exposes progress.}
 }
 \value{
-A list with class \code{strand_predict_result} containing:
-\code{job_id}, \code{status}, \code{credits_used}, \code{marker_outputs} (named list mapping
-marker name → on-disk directory when \code{output_dir} is provided, else an
-empty list), \code{output_dir}, and \code{job} (the underlying \code{strand_job} handle).
+When \code{wait = TRUE}, a list with class \code{strand_predict_result}
+containing: \code{job_id}, \code{status}, \code{credits_used}, \code{marker_outputs} (named
+list mapping marker name → on-disk directory when \code{output_dir} is
+provided, else an empty list), \code{output_dir}, and \code{job} (the underlying
+\code{strand_job} handle). When \code{wait = FALSE}, the \code{strand_job} handle
+directly (same shape as \code{\link[=strand_predict]{strand_predict()}}).
 }
 \description{
-Orchestrates upload → submit → wait → (optional) download, returning when
-the job reaches a terminal state. All sub-operations use the same exported
+Orchestrates upload → submit → (optional) wait → (optional) download. With
+\code{wait = TRUE} (default) returns when the job reaches a terminal state. With
+\code{wait = FALSE}, returns the \code{strand_job} handle as soon as upload + submit
+complete so the caller can drive \code{strand_job_wait()} /
+\code{strand_download_results()} later. All sub-operations use the same exported
 primitives (\code{\link[=strand_upload_file]{strand_upload_file()}}, \code{\link[=strand_predict]{strand_predict()}}, \code{\link[=strand_job_wait]{strand_job_wait()}},
 \code{\link[=strand_download_results]{strand_download_results()}}) so callers can drop down a level whenever they
 need finer control.
@@ -58,6 +74,15 @@ result <- strand_run(
   output_dir = "./outputs/"
 )
 cat("used", result$credits_used, "credits\n")
+
+# Choose a model explicitly:
+result <- strand_run(client, "biopsy.ome.tiff", c("CD8", "Ki67"),
+                     model = "v10-fullpanel")
+
+# Fire-and-forget — upload + submit only, then drive the job later:
+job <- strand_run(client, "biopsy.ome.tiff", c("CD8"), wait = FALSE)
+status <- strand_job_wait(job)
+spe <- strand_download_results(job)
 
 # The S3 generic also works: predict(client, ...)
 result <- predict(client, "biopsy.ome.tiff", markers = c("HER2"))

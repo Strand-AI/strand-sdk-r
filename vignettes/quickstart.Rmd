@@ -75,6 +75,31 @@ status <- strand_job_wait(job, progress = TRUE)
 stopifnot(status$status == "completed")
 ```
 
+### Choosing a model
+
+Pass `model = "v10"` for the original 7-marker panel or
+`model = "v10-fullpanel"` for the 192-marker sibling. Both share GenePT
+embeddings, so the marker vocabulary is identical between them — picking a
+model is a weights swap, not a vocab swap. Omitting `model` lets the platform
+pick (currently `v10-fullpanel`).
+
+```{r}
+job <- strand_predict(client, upload$id, markers, model = "v10-fullpanel")
+```
+
+### Fire-and-forget
+
+For long pipeline runs, pass `wait = FALSE` to `strand_run()` to return the
+job handle as soon as upload + submit complete. The job continues server-side
+— you can poll or download later from the same or a fresh process.
+
+```{r}
+job <- strand_run(client, "slide.svs", markers, wait = FALSE)
+# ...later:
+status <- strand_job_wait(job)
+spe <- strand_download_results(job)
+```
+
 ## 5. Download as SpatialExperiment
 
 `strand_download_results()` walks the OME-Zarr result store via the

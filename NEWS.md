@@ -1,3 +1,13 @@
+# strandai (development version)
+
+* `strand_predict()` and `strand_run()` now accept a `model` argument
+  (`"v10"` or `"v10-fullpanel"`). When omitted (`NULL`, the default), the
+  platform picks. Unsupported model ids are rejected client-side before any
+  HTTP call.
+* `strand_run()` now accepts `wait = FALSE` to return the `strand_job` handle
+  as soon as upload + submit complete, skipping the `wait` / `download`
+  stages. Default `wait = TRUE` preserves the prior blocking behavior.
+
 # strandai 0.1.0
 
 Initial public release of the R client for the Strand Platform API.

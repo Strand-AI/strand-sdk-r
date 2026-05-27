@@ -356,6 +356,130 @@ test_that("strand_run progress callback never receives non-numeric fractions", {
 })
 
 
+test_that("strand_run with wait=FALSE returns the job after upload+submit only", {
+  skip_if_no_webfakes()
+  # Hand-rolled minimal app: upload + submit succeed; /jobs/:id and
+  # /jobs/:id/results return errors so any stray .wait()/.download() in the
+  # wait=FALSE path surfaces as a test failure rather than silently passing.
+  app <- webfakes::new_app()
+  app$post("/api/v1/uploads", function(req, res) {
+    host <- req$get_header("host")
+    res$set_status(200L)$send_json(list(
+      uploadId = UPLOAD_ID,
+      uploadUrl = sprintf("http://%s/_gcs/resumable?upload_id=abc", host),
+      gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID)
+    ), auto_unbox = TRUE)
+  })
+  app$put("/_gcs/resumable", function(req, res) {
+    rng <- req$get_header("content-range") %||% ""
+    parts <- strsplit(rng, "[/-]")[[1]]
+    end_byte <- as.integer(parts[2])
+    end_total <- as.integer(parts[3])
+    is_final <- !is.na(end_byte) && !is.na(end_total) && end_total == (end_byte + 1L)
+    res$set_status(if (is_final) 200L else 308L)$send("")
+  })
+  app$post("/api/v1/uploads/:id/complete", function(req, res) {
+    res$set_status(200L)$send_json(list(
+      uploadId = UPLOAD_ID, status = "ready",
+      widthPx = 1024L, heightPx = 1024L
+    ), auto_unbox = TRUE)
+  })
+  app$post("/api/v1/predict", function(req, res) {
+    res$set_status(202L)$send_json(
+      list(jobId = JOB_ID, reservedCredits = 42L, status = "queued"),
+      auto_unbox = TRUE
+    )
+  })
+  app$get("/api/v1/jobs/:id", function(req, res) {
+    res$set_status(500L)$send_json(
+      list(error = "should_not_poll", message = "wait=FALSE must skip polling"),
+      auto_unbox = TRUE
+    )
+  })
+  app$get("/api/v1/jobs/:id/results", function(req, res) {
+    res$set_status(500L)$send_json(
+      list(error = "should_not_download", message = "wait=FALSE must skip download"),
+      auto_unbox = TRUE
+    )
+  })
+
+  server <- start_strand_server(app)
+  client <- testing_client(server)
+
+  tmp <- withr::local_tempdir()
+  slide <- make_slide_file(tmp)
+
+  stages <- character()
+  job <- strand_run(client, slide, "CD3",
+                    wait = FALSE,
+                    output_dir = file.path(tmp, "out"),
+                    poll_interval_sec = 0.05,
+                    timeout_sec = 10,
+                    on_progress = function(stage, fraction) {
+                      stages <<- c(stages, stage)
+                    })
+  expect_s3_class(job, "strand_job")
+  expect_equal(job$id, JOB_ID)
+  expect_equal(job$reserved_credits, 42L)
+  # Progress stages must include upload + submit but NOT wait / download.
+  expect_true(all(c("upload", "submit") %in% stages))
+  expect_false("wait" %in% stages)
+  expect_false("download" %in% stages)
+})
+
+
+test_that("strand_run forwards model on the submit body", {
+  skip_if_no_webfakes()
+  # Hand-rolled app — the handler runs out-of-process, so we encode the
+  # received `model` into `reservedCredits` as a sentinel.
+  app <- webfakes::new_app()
+  app$use(webfakes::mw_json())
+  app$post("/api/v1/uploads", function(req, res) {
+    host <- req$get_header("host")
+    res$set_status(200L)$send_json(list(
+      uploadId = UPLOAD_ID,
+      uploadUrl = sprintf("http://%s/_gcs/resumable?upload_id=abc", host),
+      gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID)
+    ), auto_unbox = TRUE)
+  })
+  app$put("/_gcs/resumable", function(req, res) {
+    rng <- req$get_header("content-range") %||% ""
+    parts <- strsplit(rng, "[/-]")[[1]]
+    end_byte <- as.integer(parts[2])
+    end_total <- as.integer(parts[3])
+    is_final <- !is.na(end_byte) && !is.na(end_total) && end_total == (end_byte + 1L)
+    res$set_status(if (is_final) 200L else 308L)$send("")
+  })
+  app$post("/api/v1/uploads/:id/complete", function(req, res) {
+    res$set_status(200L)$send_json(list(
+      uploadId = UPLOAD_ID, status = "ready",
+      widthPx = 1024L, heightPx = 1024L
+    ), auto_unbox = TRUE)
+  })
+  app$post("/api/v1/predict", function(req, res) {
+    sentinel <- if (identical(req$json$model, "v10")) 222L else 0L
+    res$set_status(202L)$send_json(
+      list(jobId = JOB_ID, reservedCredits = sentinel, status = "queued"),
+      auto_unbox = TRUE
+    )
+  })
+
+  server <- start_strand_server(app)
+  client <- testing_client(server)
+
+  tmp <- withr::local_tempdir()
+  slide <- make_slide_file(tmp)
+
+  job <- strand_run(client, slide, "CD3",
+                    model = "v10",
+                    wait = FALSE,
+                    poll_interval_sec = 0.05,
+                    timeout_sec = 10)
+  expect_s3_class(job, "strand_job")
+  expect_equal(job$reserved_credits, 222L)
+})
+
+
 test_that("strand_run validates markers and image_path before any I/O", {
   client <- strand_client(api_key = "sk-strand-test",
                           base_url = "http://127.0.0.1:1")
