@@ -1,25 +1,25 @@
-# Per-sample retention controls (Phase 2). Mirrors the REST surface:
-#   PATCH /samples/{id}/retention
-#   PATCH /samples/retention            (bulk)
+# Per-sample expiration controls (Phase 2). Mirrors the REST surface:
+#   PATCH /samples/{id}/expiration
+#   PATCH /samples/expiration            (bulk)
 #   POST  /samples/{id}/restore
 #
-# Modes are mutually exclusive — exactly one of `expires_at`, `pin = TRUE`,
-# or `use_org_default = TRUE`. We validate client-side so misuse fails
-# before the round-trip.
+# Modes are mutually exclusive — exactly one of `expires_at`,
+# `never_expire = TRUE`, or `use_org_default = TRUE`. We validate
+# client-side so misuse fails before the round-trip.
 
 # Build the JSON body shared between single + bulk endpoints. Returns a
 # named list ready for jsonlite::toJSON.
-strand_retention_body <- function(expires_at, pin, use_org_default, reason) {
-  picked <- sum(!is.null(expires_at), isTRUE(pin), isTRUE(use_org_default))
+strand_expiration_body <- function(expires_at, never_expire, use_org_default, reason) {
+  picked <- sum(!is.null(expires_at), isTRUE(never_expire), isTRUE(use_org_default))
   if (picked != 1L) {
     stop(
-      "Provide exactly one of: expires_at, pin = TRUE, or use_org_default = TRUE.",
+      "Provide exactly one of: expires_at, never_expire = TRUE, or use_org_default = TRUE.",
       call. = FALSE
     )
   }
   body <- list()
-  if (isTRUE(pin)) {
-    body$pin <- TRUE
+  if (isTRUE(never_expire)) {
+    body$neverExpire <- TRUE
   } else if (isTRUE(use_org_default)) {
     body$useOrgDefault <- TRUE
   } else {
@@ -39,18 +39,17 @@ strand_retention_body <- function(expires_at, pin, use_org_default, reason) {
   body
 }
 
-#' Set retention on a single sample
+#' Set expiration on a single sample
 #'
-#' Pin a sample to a specific expiry, pin indefinitely, or revert to the
-#' org's default retention policy.
+#' Pin a sample to a specific expiration date, set it to never expire, or
+#' clear any custom expiration and follow the org's default policy.
 #'
 #' @param client A `strand_client` from [strand_client()].
 #' @param sample_id UUID of the sample.
-#' @param expires_at A `POSIXct` (or ISO 8601 character) expiry. Pass `NULL`
-#'   together with `pin = TRUE` to pin indefinitely.
-#' @param pin If `TRUE`, pin the sample indefinitely (overrides org policy).
-#' @param use_org_default If `TRUE`, clear any override and revert to the
-#'   org's current retention policy.
+#' @param expires_at A `POSIXct` (or ISO 8601 character) expiration date.
+#' @param never_expire If `TRUE`, set the sample to never expire.
+#' @param use_org_default If `TRUE`, clear any custom expiration and follow
+#'   the org's current expiration policy.
 #' @param reason Optional governance reason (10-500 chars).
 #'
 #' @return The updated sample payload (`id`, `expiresAt`, `expiresAtSource`, ...).
@@ -58,32 +57,32 @@ strand_retention_body <- function(expires_at, pin, use_org_default, reason) {
 #' @examples
 #' \dontrun{
 #' client <- strand_client()
-#' strand_set_retention(client, sample_id, pin = TRUE,
-#'                      reason = "Active research project — keep until publication")
+#' strand_set_expiration(client, sample_id, never_expire = TRUE,
+#'                       reason = "Active research project — keep until publication")
 #' }
 #' @export
-strand_set_retention <- function(client, sample_id,
+strand_set_expiration <- function(client, sample_id,
                                   expires_at = NULL,
-                                  pin = FALSE,
+                                  never_expire = FALSE,
                                   use_org_default = FALSE,
                                   reason = NULL) {
   if (!inherits(client, "strand_client")) {
     stop("client must be a strand_client (see strand_client())", call. = FALSE)
   }
-  body <- strand_retention_body(expires_at, pin, use_org_default, reason)
+  body <- strand_expiration_body(expires_at, never_expire, use_org_default, reason)
   strand_perform_json(
-    client, sprintf("samples/%s/retention", sample_id),
+    client, sprintf("samples/%s/expiration", sample_id),
     method = "PATCH", body = body
   )
 }
 
-#' Set retention on a batch of samples (max 500)
+#' Set expiration on a batch of samples (max 500)
 #'
 #' All-or-nothing: if any sample fails the permission gate (caller is not
 #' the sample creator, an org owner/admin, or a Strand admin), the whole
 #' call returns a 403 with no rows touched.
 #'
-#' @inheritParams strand_set_retention
+#' @inheritParams strand_set_expiration
 #' @param sample_ids Character vector of sample UUIDs (length 1-500).
 #'
 #' @return A list with `updated` (integer count) and `batchId` (UUID).
@@ -91,12 +90,12 @@ strand_set_retention <- function(client, sample_id,
 #' @examples
 #' \dontrun{
 #' client <- strand_client()
-#' strand_set_retention_bulk(client, c(uuid1, uuid2, uuid3), pin = TRUE)
+#' strand_set_expiration_bulk(client, c(uuid1, uuid2, uuid3), never_expire = TRUE)
 #' }
 #' @export
-strand_set_retention_bulk <- function(client, sample_ids,
+strand_set_expiration_bulk <- function(client, sample_ids,
                                        expires_at = NULL,
-                                       pin = FALSE,
+                                       never_expire = FALSE,
                                        use_org_default = FALSE,
                                        reason = NULL) {
   if (!inherits(client, "strand_client")) {
@@ -105,16 +104,17 @@ strand_set_retention_bulk <- function(client, sample_ids,
   if (!is.character(sample_ids) || length(sample_ids) == 0L || length(sample_ids) > 500L) {
     stop("sample_ids must be a character vector of length 1-500.", call. = FALSE)
   }
-  body <- strand_retention_body(expires_at, pin, use_org_default, reason)
+  body <- strand_expiration_body(expires_at, never_expire, use_org_default, reason)
   body$sampleIds <- as.list(sample_ids)
-  strand_perform_json(client, "samples/retention", method = "PATCH", body = body)
+  strand_perform_json(client, "samples/expiration", method = "PATCH", body = body)
 }
 
-#' Restore an archived sample
+#' Restore a sample from Trash
 #'
-#' Sets `archived_at` to `NULL` and bumps `expires_at` to at least 30 days
-#' from now so the nightly reaper does not immediately re-archive it. Caller
-#' must have the same permissions required for [strand_set_retention()].
+#' Available within the 7-day Trash window. Brings the sample back to the
+#' active list and extends its expiration so it isn't immediately
+#' re-trashed. Caller must have the same permissions required for
+#' [strand_set_expiration()].
 #'
 #' @param client A `strand_client` from [strand_client()].
 #' @param sample_id UUID of the sample.
