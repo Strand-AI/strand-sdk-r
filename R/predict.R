@@ -97,6 +97,9 @@ strand_coerce_markers <- function(markers) {
 #' @param poll_interval_sec Seconds between status polls while waiting.
 #' @param on_progress Optional callback `function(stage, fraction)` where
 #'   `stage` is one of `"upload"`, `"submit"`, `"wait"`, `"download"`.
+#'   `fraction` is always a numeric in `[0, 1]` — `0` at the start of each
+#'   stage and `1` at its end, with intermediate values where the underlying
+#'   step exposes progress.
 #'
 #' @return A list with class `strand_predict_result` containing:
 #'   `job_id`, `status`, `credits_used`, `marker_outputs` (named list mapping
@@ -136,25 +139,38 @@ strand_run <- function(client, image_path, markers,
   upload <- strand_upload_file(client, image_path)
   report("upload", 1)
 
-  report("submit", NA_real_)
-  job <- strand_predict(client, upload$id, validated_markers)
-
-  report("wait", NA_real_)
-  status <- strand_job_wait(job,
-                            timeout = timeout_sec,
-                            poll_interval = poll_interval_sec)
-
+  # From here on the upload is durable on the platform; if anything downstream
+  # fails, attach upload_id to the condition so callers can resume via
+  # strand_predict(client, upload_id, markers) without paying for re-upload.
   marker_outputs <- list()
   out_dir <- NULL
-  if (!is.null(output_dir)) {
-    report("download", 0)
-    out_dir <- output_dir
-    strand_download_results(job, path = out_dir)
-    for (m in validated_markers) {
-      marker_outputs[[m]] <- file.path(out_dir, "markers", m)
+  tryCatch(
+    {
+      report("submit", 0)
+      job <- strand_predict(client, upload$id, validated_markers)
+      report("submit", 1)
+
+      report("wait", 0)
+      status <- strand_job_wait(job,
+                                timeout = timeout_sec,
+                                poll_interval = poll_interval_sec)
+      report("wait", 1)
+
+      if (!is.null(output_dir)) {
+        report("download", 0)
+        out_dir <- output_dir
+        strand_download_results(job, path = out_dir)
+        for (m in validated_markers) {
+          marker_outputs[[m]] <- file.path(out_dir, "markers", m)
+        }
+        report("download", 1)
+      }
+    },
+    error = function(e) {
+      if (is.null(e$upload_id)) e$upload_id <- upload$id
+      stop(e)
     }
-    report("download", 1)
-  }
+  )
 
   structure(
     list(

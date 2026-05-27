@@ -31,7 +31,10 @@ OME-Zarr result store is mirrored under this directory.}
 \item{poll_interval_sec}{Seconds between status polls while waiting.}
 
 \item{on_progress}{Optional callback \verb{function(stage, fraction)} where
-\code{stage} is one of \code{"upload"}, \code{"submit"}, \code{"wait"}, \code{"download"}.}
+\code{stage} is one of \code{"upload"}, \code{"submit"}, \code{"wait"}, \code{"download"}.
+\code{fraction} is always a numeric in \verb{[0, 1]} — \code{0} at the start of each
+stage and \code{1} at its end, with intermediate values where the underlying
+step exposes progress.}
 }
 \value{
 A list with class \code{strand_predict_result} containing:

@@ -279,6 +279,83 @@ test_that("strand_run reports progress for every pipeline stage", {
 })
 
 
+test_that("strand_run attaches upload_id to errors raised after upload", {
+  skip_if_no_webfakes()
+  # Build a pipeline app from scratch that succeeds at upload but rejects
+  # predict with unknown_markers — exercising the error path that needs
+  # upload_id attached so callers can recover via strand_predict().
+  app <- webfakes::new_app()
+  app$post("/api/v1/uploads", function(req, res) {
+    host <- req$get_header("host")
+    res$set_status(200L)$send_json(list(
+      uploadId = UPLOAD_ID,
+      uploadUrl = sprintf("http://%s/_gcs/resumable?upload_id=abc", host),
+      gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID)
+    ), auto_unbox = TRUE)
+  })
+  app$put("/_gcs/resumable", function(req, res) {
+    rng <- req$get_header("content-range") %||% ""
+    parts <- strsplit(rng, "[/-]")[[1]]
+    end_byte <- as.integer(parts[2])
+    end_total <- as.integer(parts[3])
+    is_final <- !is.na(end_byte) && !is.na(end_total) && end_total == (end_byte + 1L)
+    res$set_status(if (is_final) 200L else 308L)$send("")
+  })
+  app$post("/api/v1/uploads/:id/complete", function(req, res) {
+    res$set_status(200L)$send_json(list(
+      uploadId = UPLOAD_ID, status = "ready",
+      widthPx = 1024L, heightPx = 1024L
+    ), auto_unbox = TRUE)
+  })
+  app$post("/api/v1/predict", function(req, res) {
+    res$set_status(400L)$send_json(list(
+      error = "unknown_markers",
+      message = "Unknown marker: NOPE",
+      unknownMarkers = list("NOPE"),
+      knownMarkersSample = list("CD3", "CD8")
+    ), auto_unbox = TRUE)
+  })
+  server <- start_strand_server(app)
+  client <- testing_client(server)
+
+  tmp <- withr::local_tempdir()
+  slide <- make_slide_file(tmp)
+
+  err <- tryCatch(
+    strand_run(client, slide, "NOPE",
+               poll_interval_sec = 0.05, timeout_sec = 10),
+    strand_unknown_markers_error = function(e) e
+  )
+  expect_s3_class(err, "strand_unknown_markers_error")
+  expect_equal(err$upload_id, UPLOAD_ID)
+  expect_equal(err$unknown, "NOPE")
+})
+
+
+test_that("strand_run progress callback never receives non-numeric fractions", {
+  skip_if_no_webfakes()
+  server <- start_strand_server(build_pipeline_app("CD3"))
+  client <- testing_client(server)
+
+  tmp <- withr::local_tempdir()
+  slide <- make_slide_file(tmp)
+  out <- file.path(tmp, "out")
+
+  fractions <- numeric()
+  strand_run(client, slide, "CD3",
+             output_dir = out,
+             poll_interval_sec = 0.05,
+             timeout_sec = 10,
+             on_progress = function(stage, fraction) {
+               fractions <<- c(fractions, fraction)
+             })
+
+  expect_true(all(is.numeric(fractions)))
+  expect_true(all(!is.na(fractions)))
+  expect_true(all(fractions >= 0 & fractions <= 1))
+})
+
+
 test_that("strand_run validates markers and image_path before any I/O", {
   client <- strand_client(api_key = "sk-strand-test",
                           base_url = "http://127.0.0.1:1")

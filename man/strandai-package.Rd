@@ -34,16 +34,18 @@ Mint API keys at \verb{https://app.strandai.com/settings/api-keys}. Pass with
 Useful links:
 \itemize{
   \item \url{https://strandai.com}
-  \item \url{https://app.strandai.com/docs/api}
+  \item \url{https://docs.strandai.com}
+  \item \url{https://github.com/Strand-AI/strand-sdk-r}
+  \item Report bugs at \url{https://github.com/Strand-AI/strand-sdk-r/issues}
 }
 
 }
 \author{
-\strong{Maintainer}: Strand AI \email{engineering@strandai.bio} [copyright holder]
+\strong{Maintainer}: Strand AI \email{support@strandai.com} [copyright holder]
 
 Authors:
 \itemize{
-  \item Strand AI \email{engineering@strandai.bio} [copyright holder]
+  \item Strand AI \email{support@strandai.com} [copyright holder]
 }
 
 }
