@@ -116,6 +116,9 @@ build_pipeline_app <- function(markers) {
   })
 
   # 5) Job status — return completed straight away so the wait loop exits.
+  #    Echoes the canonical v0.X label per design note §4 — the platform
+  #    normalizes legacy aliases before persisting, so this field is always
+  #    a live v0.X id on responses.
   app$get("/api/v1/jobs/:id", function(req, res) {
     res$set_status(200L)$send_json(
       list(
@@ -124,6 +127,7 @@ build_pipeline_app <- function(markers) {
         progress = 1.0,
         reservedCredits = 42L,
         markers = as.list(markers),
+        model = "v0.5",
         createdAt = NULL,
         startedAt = NULL,
         completedAt = "2026-05-20T10:05:00Z",
@@ -212,6 +216,10 @@ test_that("strand_run runs the full pipeline and writes the zarr store", {
   expect_equal(result$job_id, JOB_ID)
   expect_equal(result$status, "completed")
   expect_equal(result$credits_used, 42L)
+  # `result$model` echoes the canonical v0.X label the platform persisted —
+  # never a legacy alias, never NULL on a fresh response. This is the §0
+  # hard constraint manifesting on the R result list.
+  expect_equal(result$model, "v0.5")
   expect_equal(result$output_dir, out)
   expect_setequal(names(result$marker_outputs), c("CD3", "CD8"))
   expect_equal(result$marker_outputs$CD3, file.path(out, "markers", "CD3"))
@@ -457,7 +465,7 @@ test_that("strand_run forwards model on the submit body", {
     ), auto_unbox = TRUE)
   })
   app$post("/api/v1/predict", function(req, res) {
-    sentinel <- if (identical(req$json$model, "v10")) 222L else 0L
+    sentinel <- if (identical(req$json$model, "v0.5")) 222L else 0L
     res$set_status(202L)$send_json(
       list(jobId = JOB_ID, reservedCredits = sentinel, status = "queued"),
       auto_unbox = TRUE
@@ -471,7 +479,7 @@ test_that("strand_run forwards model on the submit body", {
   slide <- make_slide_file(tmp)
 
   job <- strand_run(client, slide, "CD3",
-                    model = "v10",
+                    model = "v0.5",
                     wait = FALSE,
                     poll_interval_sec = 0.05,
                     timeout_sec = 10)

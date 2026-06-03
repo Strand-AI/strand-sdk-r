@@ -1,21 +1,59 @@
 # Predict surface — estimate + submit.
 
-# SDK-routable model ids. Anything else (or omitting the param) lets the
-# platform pick — currently equivalent to v10-fullpanel per the
-# `MODAL_ENDPOINT_URL` env, but treat that fallback as an implementation detail
-# of the backend.
-STRAND_SUPPORTED_MODELS <- c("v10", "v10-fullpanel")
+# Canonical SDK-routable POSTMAN versions. Mirrors `POSTMAN_VERSIONS` in
+# `platform/src/lib/inference/postman-versions.ts` — the SDK can't import
+# from the platform's TS source, so this list has to be kept in lockstep
+# with each new version cut. See `infra/notes/postman-versioning-2026-06.md`
+# §4 for the input/output asymmetry: legacy aliases are accepted on input
+# with a deprecation warning; the canonical v0.X label is what the
+# platform persists and echoes back.
+STRAND_SUPPORTED_MODELS <- c("v0.4", "v0.5")
+
+# Legacy → canonical alias table. Six-month sunset window per design note
+# §4: legacy strings remain accepted until 2026-12-01, with a
+# deprecation warning on each call. "v10" is special — it resolved to
+# the now-sunset v0.3, so the SDK warns *and* the platform 400s with
+# `unknown_model`.
+STRAND_LEGACY_MODEL_ALIASES <- list(
+  "v10-fullpanel"    = "v0.4",
+  "v10-fullpanel-v2" = "v0.5"
+)
+
+# Sunset aliases — accepted on input so existing scripts don't error
+# client-side, but passed through unchanged so the server can answer
+# with its canonical `unknown_model` response.
+STRAND_SUNSET_MODEL_ALIASES <- c("v10")
 
 strand_validate_model <- function(model) {
   if (is.null(model)) return(NULL)
   if (!is.character(model) || length(model) != 1L || is.na(model) || !nzchar(model)) {
     stop("model must be NULL or a single non-empty string", call. = FALSE)
   }
-  if (!(model %in% STRAND_SUPPORTED_MODELS)) {
-    stop(sprintf("Unsupported model %s; expected one of: %s",
-                 dQuote(model), paste(STRAND_SUPPORTED_MODELS, collapse = ", ")),
-         call. = FALSE)
+  # Canonical id → pass through.
+  if (model %in% STRAND_SUPPORTED_MODELS) {
+    return(model)
   }
+  # Legacy alias → warn and rewrite to canonical.
+  if (model %in% names(STRAND_LEGACY_MODEL_ALIASES)) {
+    canonical <- STRAND_LEGACY_MODEL_ALIASES[[model]]
+    warning(sprintf(
+      "model = %s is a deprecated alias for %s; pass model = %s instead. Legacy aliases will be removed in a future release (target: 2026-12-01).",
+      dQuote(model), dQuote(canonical), dQuote(canonical)
+    ), call. = FALSE)
+    return(canonical)
+  }
+  # Sunset alias → warn and pass through; the server will 400.
+  if (model %in% STRAND_SUNSET_MODEL_ALIASES) {
+    warning(sprintf(
+      "model = %s refers to a sunset POSTMAN version and is no longer dispatched. The server will reject this request with `unknown_model`; use one of: %s.",
+      dQuote(model), paste(STRAND_SUPPORTED_MODELS, collapse = ", ")
+    ), call. = FALSE)
+    return(model)
+  }
+  # Unknown string → pass through. The server is the authority on which
+  # versions are live; client-side rejecting an id the SDK happens not
+  # to know about would block forward-compatibility with new versions
+  # added on the server without a SDK release.
   model
 }
 
@@ -59,11 +97,13 @@ strand_estimate <- function(client, upload_id, markers) {
 #' condition with a `required` field.
 #'
 #' @inheritParams strand_estimate
-#' @param model Optional explicit model id. Currently `"v10"` (the original
-#'   7-marker panel) or `"v10-fullpanel"` (the 192-marker sibling). When `NULL`
-#'   (default), the platform picks. The two models share GenePT weights — a
-#'   marker request against the wrong endpoint is just a model-weights swap,
-#'   not a different vocab.
+#' @param model Optional explicit POSTMAN version. One of `"v0.4"` (192-marker
+#'   original) or `"v0.5"` (192-marker retrained, current default). Both share
+#'   GenePT embeddings — picking a version is a model-weights swap, not a
+#'   vocab swap. When `NULL` (default), the platform picks. Legacy aliases
+#'   (`"v10-fullpanel"` → `"v0.4"`, `"v10-fullpanel-v2"` → `"v0.5"`) are still
+#'   accepted with a deprecation warning; `"v10"` (which used to resolve to
+#'   the now-sunset v0.3) warns and is rejected by the server.
 #'
 #' @return A `strand_job` list with `id`, `reserved_credits`, `client`.
 #'
@@ -72,9 +112,9 @@ strand_estimate <- function(client, upload_id, markers) {
 #' job <- strand_predict(client, upload$id, c("CD3", "CD8"))
 #' strand_job_wait(job)
 #'
-#' # Explicitly target the full 192-marker panel:
+#' # Explicitly target a specific version:
 #' job <- strand_predict(client, upload$id, c("CD3", "CD8"),
-#'                       model = "v10-fullpanel")
+#'                       model = "v0.5")
 #' }
 #' @export
 strand_predict <- function(client, upload_id, markers, model = NULL) {
@@ -159,9 +199,9 @@ strand_coerce_markers <- function(markers) {
 #' )
 #' cat("used", result$credits_used, "credits\n")
 #'
-#' # Choose a model explicitly:
+#' # Choose a version explicitly:
 #' result <- strand_run(client, "biopsy.ome.tiff", c("CD8", "Ki67"),
-#'                      model = "v10-fullpanel")
+#'                      model = "v0.5")
 #'
 #' # Fire-and-forget — upload + submit only, then drive the job later:
 #' job <- strand_run(client, "biopsy.ome.tiff", c("CD8"), wait = FALSE)
@@ -237,6 +277,12 @@ strand_run <- function(client, image_path, markers,
       job_id = job$id,
       status = status$status,
       credits_used = job$reserved_credits %||% 0L,
+      # Canonical v0.X label the platform actually ran. Reading off
+      # `status$model` (rather than the user-supplied `model` arg) so we
+      # surface what dispatched even when the caller omitted `model =`
+      # and the platform picked its default. `NULL` against older
+      # servers that didn't return the field on the job payload.
+      model = status$model,
       marker_outputs = marker_outputs,
       output_dir = out_dir,
       job = job
@@ -251,6 +297,9 @@ print.strand_predict_result <- function(x, ...) {
   cat("  job_id:       ", x$job_id, "\n", sep = "")
   cat("  status:       ", x$status, "\n", sep = "")
   cat("  credits_used: ", x$credits_used, "\n", sep = "")
+  if (!is.null(x$model)) {
+    cat("  model:        ", x$model, "\n", sep = "")
+  }
   if (!is.null(x$output_dir)) {
     cat("  output_dir:   ", x$output_dir, "\n", sep = "")
   }

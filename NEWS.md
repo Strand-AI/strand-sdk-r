@@ -1,3 +1,36 @@
+# strandai 0.5.0
+
+## Changed
+
+* `strand_predict()` and `strand_run()` now route to the canonical POSTMAN
+  version track (`"v0.4"` and `"v0.5"`). The earlier `"v10"`,
+  `"v10-fullpanel"`, and `"v10-fullpanel-v2"` ids are still accepted on input
+  as deprecated aliases; the SDK rewrites `"v10-fullpanel"` → `"v0.4"` and
+  `"v10-fullpanel-v2"` → `"v0.5"` before sending and emits a deprecation
+  `warning()` on each call. `"v10"` warns and is forwarded unchanged; the
+  server returns 400 `unknown_model` because v0.3 was sunset. Aliases will be
+  removed on 2026-12-01. See `infra/notes/postman-versioning-2026-06.md` §4
+  in the platform repo.
+* `strand_job_get()` and the `strand_predict_result` list returned by
+  `strand_run()` now include a `model` field carrying the canonical v0.X
+  label the platform persisted. `NULL` against older servers that didn't
+  populate it.
+* `strand_predict(model = "<unknown>")` no longer rejects unknown strings
+  client-side; the server is the authority on which versions are live.
+  Empty / NA / multi-element `model` values are still rejected up-front.
+
+## Migration
+
+```r
+# Before
+job <- strand_predict(client, upload$id, c("CD8"), model = "v10-fullpanel-v2")
+# After (no warning, future-proof through 2026-12-01)
+job <- strand_predict(client, upload$id, c("CD8"), model = "v0.5")
+```
+
+Legacy strings keep working until 2026-12-01; the deprecation warning is the
+only change visible to a caller that doesn't migrate.
+
 # strandai 0.4.0
 
 ## BREAKING

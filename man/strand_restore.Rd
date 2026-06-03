@@ -16,8 +16,8 @@ The restored sample payload (\code{id}, \code{archivedAt}, \code{expiresAt}).
 }
 \description{
 Available within the 7-day Trash window. Brings the sample back to the
-active list and extends its expiration so it isn't immediately re-trashed.
-Caller must have the same permissions required for
+active list and extends its expiration so it isn't immediately
+re-trashed. Caller must have the same permissions required for
 \code{\link[=strand_set_expiration]{strand_set_expiration()}}.
 }
 \examples{

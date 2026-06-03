@@ -25,6 +25,11 @@ strand_parse_job <- function(raw) {
     progress = raw$progress,
     reserved_credits = raw$reservedCredits,
     markers = unlist(raw$markers %||% list(), use.names = FALSE),
+    # Canonical v0.X POSTMAN version that ran. The platform normalizes
+    # legacy aliases before persisting (design note §0 / §4), so this
+    # field is always a v0.X label when the server populated it. `NULL`
+    # against older deploys that didn't emit `model` on the job payload.
+    model = raw$model,
     created_at = raw$createdAt,
     started_at = raw$startedAt,
     completed_at = raw$completedAt,
