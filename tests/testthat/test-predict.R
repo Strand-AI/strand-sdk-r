@@ -97,72 +97,51 @@ test_that("strand_predict forwards canonical v0.X model ids unchanged", {
   expect_equal(job$reserved_credits, 5L)
 })
 
-test_that("strand_predict accepts legacy v10-* aliases with a deprecation warning", {
+test_that("strand_predict forwards legacy v10-* strings to the server (no SDK rewrite or warning)", {
   skip_if_no_webfakes()
-  # The SDK rewrites `"v10-fullpanel"` → `"v0.4"` and
-  # `"v10-fullpanel-v2"` → `"v0.5"` before sending, so the server only
-  # ever sees the canonical id. This keeps older callers on the air
-  # without requiring the platform to accept the legacy enum.
+  # The legacy alias-rewriting path was dropped on 2026-06-03 (design
+  # note §4, rewritten). The SDK no longer warns and no longer rewrites
+  # `"v10*"` → `"v0.X"` before sending; the string is forwarded as-is and
+  # the server answers with its canonical `unknown_model` 400. This is
+  # the same path any unknown / future string takes — one error
+  # surface, no SDK-side validation. We assert (a) no warning fires and
+  # (b) the request reaches the server (which 400s).
   app <- webfakes::new_app()
   app$use(webfakes::mw_json())
-  app$post("/api/v1/predict", function(req, res) {
-    sent_model <- req$json$model
-    sentinel <- if (identical(sent_model, "v0.4")) 4L
-                else if (identical(sent_model, "v0.5")) 5L
-                else 99L
-    res$set_status(202L)$send_json(list(
-      jobId = "22222222-2222-2222-2222-222222222222",
-      reservedCredits = sentinel,
-      status = "queued"
-    ), auto_unbox = TRUE)
-  })
-  server <- start_strand_server(app)
-  client <- testing_client(server)
-
-  # "v10-fullpanel" → warns, rewritten to "v0.4".
-  expect_warning(
-    job <- strand_predict(client, "u-1", c("CD3"), model = "v10-fullpanel"),
-    "deprecated alias.*v0\\.4"
-  )
-  expect_equal(job$reserved_credits, 4L)
-
-  # "v10-fullpanel-v2" → warns, rewritten to "v0.5".
-  expect_warning(
-    job <- strand_predict(client, "u-1", c("CD3"), model = "v10-fullpanel-v2"),
-    "deprecated alias.*v0\\.5"
-  )
-  expect_equal(job$reserved_credits, 5L)
-})
-
-test_that("strand_predict warns on sunset v10 alias and forwards to server", {
-  skip_if_no_webfakes()
-  # The "v10" alias used to resolve to v0.3, which is sunset. The SDK
-  # emits a deprecation warning so the caller sees the rename, but
-  # forwards the string unchanged so the server can answer with its
-  # canonical `unknown_model` 400 (rather than the SDK rewriting to
-  # `"v0.3"` and getting a different error).
-  app <- webfakes::new_app()
-  app$use(webfakes::mw_json())
-  received <- list()
   app$post("/api/v1/predict", function(req, res) {
     res$set_status(400L)$send_json(list(
       error = "unknown_model",
-      message = "Unknown model: v10"
+      message = "Unknown model"
     ), auto_unbox = TRUE)
   })
   server <- start_strand_server(app)
   client <- testing_client(server)
 
-  err <- tryCatch(
-    {
-      expect_warning(
-        strand_predict(client, "u-1", c("CD3"), model = "v10"),
-        "sunset POSTMAN version"
-      )
-    },
-    strand_bad_request_error = function(e) e
-  )
-  expect_s3_class(err, "strand_bad_request_error")
+  for (legacy in c("v10", "v10-fullpanel", "v10-fullpanel-v2")) {
+    err <- tryCatch(
+      withCallingHandlers(
+        strand_predict(client, "u-1", c("CD3"), model = legacy),
+        warning = function(w) {
+          fail(sprintf("unexpected warning for legacy model %s: %s", legacy, conditionMessage(w)))
+        }
+      ),
+      strand_bad_request_error = function(e) e
+    )
+    expect_s3_class(err, "strand_bad_request_error")
+  }
+})
+
+test_that("strand_validate_model() returns the input unchanged for legacy strings", {
+  # Source-level contract pin: post-2026-06-03 the helper is a no-op for
+  # anything that survives the structural validators. Legacy strings,
+  # unknown strings, canonical ids all pass through. This catches a
+  # future PR that accidentally re-introduces alias rewriting.
+  expect_identical(strand_validate_model("v0.5"), "v0.5")
+  expect_identical(strand_validate_model("v10"), "v10")
+  expect_identical(strand_validate_model("v10-fullpanel"), "v10-fullpanel")
+  expect_identical(strand_validate_model("v10-fullpanel-v2"), "v10-fullpanel-v2")
+  expect_identical(strand_validate_model("v0.99"), "v0.99")
+  expect_null(strand_validate_model(NULL))
 })
 
 test_that("strand_predict passes unknown model strings through to the server", {

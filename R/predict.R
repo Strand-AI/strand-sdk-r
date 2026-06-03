@@ -4,56 +4,22 @@
 # `platform/src/lib/inference/postman-versions.ts` — the SDK can't import
 # from the platform's TS source, so this list has to be kept in lockstep
 # with each new version cut. See `infra/notes/postman-versioning-2026-06.md`
-# §4 for the input/output asymmetry: legacy aliases are accepted on input
-# with a deprecation warning; the canonical v0.X label is what the
-# platform persists and echoes back.
+# §4 (rewritten 2026-06-03): legacy alias rewriting was dropped from both
+# the SDK and the server. Unknown / legacy strings now flow straight
+# through to the server, which returns 400 `unknown_model`. This list
+# stays purely as caller-facing documentation — the SDK doesn't reject
+# anything client-side, the server is the authority.
 STRAND_SUPPORTED_MODELS <- c("v0.4", "v0.5")
-
-# Legacy → canonical alias table. Six-month sunset window per design note
-# §4: legacy strings remain accepted until 2026-12-01, with a
-# deprecation warning on each call. "v10" is special — it resolved to
-# the now-sunset v0.3, so the SDK warns *and* the platform 400s with
-# `unknown_model`.
-STRAND_LEGACY_MODEL_ALIASES <- list(
-  "v10-fullpanel"    = "v0.4",
-  "v10-fullpanel-v2" = "v0.5"
-)
-
-# Sunset aliases — accepted on input so existing scripts don't error
-# client-side, but passed through unchanged so the server can answer
-# with its canonical `unknown_model` response.
-STRAND_SUNSET_MODEL_ALIASES <- c("v10")
 
 strand_validate_model <- function(model) {
   if (is.null(model)) return(NULL)
   if (!is.character(model) || length(model) != 1L || is.na(model) || !nzchar(model)) {
     stop("model must be NULL or a single non-empty string", call. = FALSE)
   }
-  # Canonical id → pass through.
-  if (model %in% STRAND_SUPPORTED_MODELS) {
-    return(model)
-  }
-  # Legacy alias → warn and rewrite to canonical.
-  if (model %in% names(STRAND_LEGACY_MODEL_ALIASES)) {
-    canonical <- STRAND_LEGACY_MODEL_ALIASES[[model]]
-    warning(sprintf(
-      "model = %s is a deprecated alias for %s; pass model = %s instead. Legacy aliases will be removed in a future release (target: 2026-12-01).",
-      dQuote(model), dQuote(canonical), dQuote(canonical)
-    ), call. = FALSE)
-    return(canonical)
-  }
-  # Sunset alias → warn and pass through; the server will 400.
-  if (model %in% STRAND_SUNSET_MODEL_ALIASES) {
-    warning(sprintf(
-      "model = %s refers to a sunset POSTMAN version and is no longer dispatched. The server will reject this request with `unknown_model`; use one of: %s.",
-      dQuote(model), paste(STRAND_SUPPORTED_MODELS, collapse = ", ")
-    ), call. = FALSE)
-    return(model)
-  }
-  # Unknown string → pass through. The server is the authority on which
-  # versions are live; client-side rejecting an id the SDK happens not
-  # to know about would block forward-compatibility with new versions
-  # added on the server without a SDK release.
+  # No client-side rewriting or warning. Pass the caller's string through
+  # to the server, which is the authority on which ids are live. Legacy
+  # `"v10*"` aliases were dropped on 2026-06-03 (design note §4,
+  # rewritten); they now 400 with `unknown_model` server-side.
   model
 }
 
@@ -100,10 +66,9 @@ strand_estimate <- function(client, upload_id, markers) {
 #' @param model Optional explicit POSTMAN version. One of `"v0.4"` (192-marker
 #'   original) or `"v0.5"` (192-marker retrained, current default). Both share
 #'   GenePT embeddings — picking a version is a model-weights swap, not a
-#'   vocab swap. When `NULL` (default), the platform picks. Legacy aliases
-#'   (`"v10-fullpanel"` → `"v0.4"`, `"v10-fullpanel-v2"` → `"v0.5"`) are still
-#'   accepted with a deprecation warning; `"v10"` (which used to resolve to
-#'   the now-sunset v0.3) warns and is rejected by the server.
+#'   vocab swap. When `NULL` (default), the platform picks. The legacy
+#'   `"v10"` / `"v10-fullpanel"` / `"v10-fullpanel-v2"` ids were dropped on
+#'   2026-06-03 — the server now returns 400 `unknown_model` for any of them.
 #'
 #' @return A `strand_job` list with `id`, `reserved_credits`, `client`.
 #'

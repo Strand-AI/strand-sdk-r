@@ -1,3 +1,28 @@
+# strandai 0.5.1
+
+## Changed
+
+* Dropped the legacy `"v10"` / `"v10-fullpanel"` / `"v10-fullpanel-v2"`
+  alias-rewriting path. `strand_validate_model()` no longer warns and no
+  longer rewrites legacy strings client-side; they're forwarded verbatim to
+  the server, which now returns 400 `unknown_model`. Pass `model = "v0.4"`
+  or `model = "v0.5"` directly. The original 0.5.0 release notes (below)
+  called out a 2026-12-01 sunset window; we collapsed that to a hard
+  cutover on 2026-06-03 after the in-the-wild traffic sample showed no
+  callers still emitting the legacy strings. See
+  `infra/notes/postman-versioning-2026-06.md` §4 (rewritten 2026-06-03)
+  in the platform repo.
+* The `model` field on `strand_predict_result` and `strand_job_get()` may
+  now surface `"v0.1"` (the renumbered legacy 35-marker base; design note
+  §8.2, locked 2026-06-03) instead of `"v0.3"` on historical jobs that
+  ran on `wx0hp7fb`.
+
+## Migration
+
+No action required if you already migrated to canonical v0.X ids per
+0.5.0 below. If you're still passing `"v10*"` strings, expect a 400
+`unknown_model` response and update the call to the canonical id.
+
 # strandai 0.5.0
 
 ## Changed
