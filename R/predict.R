@@ -1,6 +1,6 @@
 # Predict surface — estimate + submit.
 
-# Canonical SDK-routable POSTMAN versions. Mirrors `POSTMAN_VERSIONS` in
+# Canonical SDK-routable Prism versions. Mirrors `POSTMAN_VERSIONS` in
 # `platform/src/lib/inference/postman-versions.ts` — the SDK can't import
 # from the platform's TS source, so this list has to be kept in lockstep
 # with each new version cut. See `infra/notes/postman-versioning-2026-06.md`
@@ -63,7 +63,7 @@ strand_estimate <- function(client, upload_id, markers) {
 #' condition with a `required` field.
 #'
 #' @inheritParams strand_estimate
-#' @param model Optional explicit POSTMAN version. One of `"v0.4"` (192-marker
+#' @param model Optional explicit Prism version. One of `"v0.4"` (192-marker
 #'   original) or `"v0.5"` (192-marker retrained, current default). Both share
 #'   GenePT embeddings — picking a version is a model-weights swap, not a
 #'   vocab swap. When `NULL` (default), the platform picks. The legacy

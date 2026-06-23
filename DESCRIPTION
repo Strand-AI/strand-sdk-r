@@ -6,7 +6,7 @@ Authors@R: c(
     person("Strand AI", role = c("aut", "cre", "cph"),
            email = "support@strandai.com"))
 Description: R client for the Strand Platform 'REST' API. Provides functions to
-    upload Whole Slide Images via 'GCS' resumable upload, submit 'POSTMAN' H&E
+    upload Whole Slide Images via 'GCS' resumable upload, submit 'Prism' H&E
     to multiplex protein inference jobs, and download 'OME-Zarr' predictions as
     'SpatialExperiment' objects from Bioconductor. Designed for spatial-omics
     research workflows in pharma and academic labs.

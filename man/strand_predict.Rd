@@ -13,7 +13,7 @@ strand_predict(client, upload_id, markers, model = NULL)
 
 \item{markers}{Character vector of marker names (e.g. \code{c("CD3", "CD8")}).}
 
-\item{model}{Optional explicit POSTMAN version. One of \code{"v0.4"} (192-marker
+\item{model}{Optional explicit Prism version. One of \code{"v0.4"} (192-marker
 original) or \code{"v0.5"} (192-marker retrained, current default). Both share
 GenePT embeddings — picking a version is a model-weights swap, not a
 vocab swap. When \code{NULL} (default), the platform picks. Legacy aliases

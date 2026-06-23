@@ -72,7 +72,7 @@ and `timeout_sec` / `poll_interval_sec` / `output_dir` are ignored.
 ### Choosing a model
 
 `strand_predict()` and `strand_run()` accept an optional `model =`. Live
-POSTMAN versions:
+Prism versions:
 
 - `"v0.4"` — 192-marker panel, original training.
 - `"v0.5"` — 192-marker panel, retrained (current default).
