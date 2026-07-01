@@ -27,7 +27,7 @@ No action required if you already migrated to canonical v0.X ids per
 
 ## Changed
 
-* `strand_predict()` and `strand_run()` now route to the canonical Prism
+* `strand_predict()` and `strand_run()` now route to the canonical Lattice
   version track (`"v0.4"` and `"v0.5"`). The earlier `"v10"`,
   `"v10-fullpanel"`, and `"v10-fullpanel-v2"` ids are still accepted on input
   as deprecated aliases; the SDK rewrites `"v10-fullpanel"` → `"v0.4"` and

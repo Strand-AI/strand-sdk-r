@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 
 This vignette walks end-to-end through the [Strand Platform](https://strandai.com)
 API using the `strand` R package: upload a Whole Slide Image (WSI), submit a
-Prism H&E to multiplex protein inference job, wait for completion, and pull
+Lattice H&E to multiplex protein inference job, wait for completion, and pull
 results back as a `SpatialExperiment`.
 
 > The chunks below set `eval = FALSE` so the vignette renders cleanly on CRAN

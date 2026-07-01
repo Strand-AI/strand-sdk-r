@@ -25,7 +25,7 @@ strand_parse_job <- function(raw) {
     progress = raw$progress,
     reserved_credits = raw$reservedCredits,
     markers = unlist(raw$markers %||% list(), use.names = FALSE),
-    # Canonical v0.X Prism version that ran. The platform normalizes
+    # Canonical v0.X Lattice version that ran. The platform normalizes
     # legacy aliases before persisting (design note §0 / §4), so this
     # field is always a v0.X label when the server populated it. `NULL`
     # against older deploys that didn't emit `model` on the job payload.

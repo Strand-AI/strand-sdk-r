@@ -148,7 +148,7 @@ test_that("strand_predict passes unknown model strings through to the server", {
   skip_if_no_webfakes()
   # An unknown string is forwarded verbatim — no SDK-side warning, no
   # client-side validation. Keeps the SDK forward-compatible with new
-  # Prism versions added on the server without an R SDK release.
+  # Lattice versions added on the server without an R SDK release.
   app <- webfakes::new_app()
   app$use(webfakes::mw_json())
   app$post("/api/v1/predict", function(req, res) {

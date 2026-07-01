@@ -7,7 +7,7 @@
 \title{strandai: Client for the Strand Platform API}
 \description{
 R client for the Strand Platform REST API. Provides functions to upload
-Whole Slide Images via GCS resumable upload, submit Prism H&E to
+Whole Slide Images via GCS resumable upload, submit Lattice H&E to
 multiplex protein inference jobs, and download OME-Zarr predictions as
 SpatialExperiment objects.
 }
