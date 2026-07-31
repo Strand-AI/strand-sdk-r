@@ -64,6 +64,8 @@ message("submitted ", job$id)
 # Later (same process or a fresh one via `strand_job_get(client, job$id)`):
 status <- strand_job_wait(job)
 spe <- strand_download_results(job)
+# or render a single pyramidal OME-TIFF for QuPath or Fiji:
+strand_download_ome_tiff(job, "result.ome.tiff", progress = TRUE)
 ```
 
 Cancel an in-flight job to refund its reserved credits and release the
