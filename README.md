@@ -105,6 +105,19 @@ them. Pass the canonical v0.X id instead:
 | `"v10-fullpanel"`       | `"v0.4"`      |
 | `"v10"`                 | (sunset — no replacement; the underlying 35-marker base was retired) |
 
+### Setting slide scale
+
+If a slide's physical pixel size is missing or incorrect, set the base-level
+microns per pixel before submitting a job. Omit `mpp_y` for isotropic pixels:
+
+```r
+strand_set_mpp(client, upload$id, 0.26)
+strand_set_mpp(client, upload$id, 0.26, 0.25)
+```
+
+The user-reported value takes precedence over embedded slide metadata for
+subsequent inference jobs.
+
 ### Lower-level primitives
 
 The submit / wait / download steps stay exported for fine-grained control:
@@ -162,6 +175,7 @@ R/
   uploads.R                 strand_upload_file (resumable chunked PUT to GCS)
   predict.R                 strand_estimate, strand_predict (submit),
                             strand_run (full pipeline), predict.strand_client
+  mpp.R                     strand_set_mpp (physical pixel-size override)
   jobs.R                    strand_job_get + strand_job_wait
   results.R                 strand_download_results + SpatialExperiment
 tests/testthat/             unit tests using webfakes (in-process http server)
