@@ -1,3 +1,14 @@
+# strandai 0.6.0
+
+## Added
+
+* Added `strand_set_mpp()` for user-reported physical pixel-size overrides.
+* Added `strand_job_cancel()` for cancelling in-flight jobs and retrieving the
+  refreshed status.
+* Added `strand_uploads_list()` and `strand_uploads_get()` for upload reads.
+* Added `strand_ome_tiff_request()`, `strand_ome_tiff_get()`, and
+  `strand_download_ome_tiff()` for asynchronous OME-TIFF export and download.
+
 # strandai 0.5.2
 
 ## Changed
