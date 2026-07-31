@@ -77,7 +77,7 @@ cat("used", result$credits_used, "credits\n")
 
 # Choose a version explicitly:
 result <- strand_run(client, "biopsy.ome.tiff", c("CD8", "Ki67"),
-                     model = "v0.5")
+                     model = "v0.7")
 
 # Fire-and-forget — upload + submit only, then drive the job later:
 job <- strand_run(client, "biopsy.ome.tiff", c("CD8"), wait = FALSE)

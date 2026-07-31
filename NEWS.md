@@ -1,3 +1,11 @@
+# strandai 0.5.2
+
+## Changed
+
+* Added `"v0.7"`, the current dispatchable Lattice version and default, to the
+  documented model ids. `"v0.4"` and `"v0.5"` remain readable on historical
+  jobs but return 400 `model_sunset` for new submissions.
+
 # strandai 0.5.1
 
 ## Changed

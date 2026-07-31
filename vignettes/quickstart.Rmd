@@ -77,14 +77,13 @@ stopifnot(status$status == "completed")
 
 ### Choosing a model
 
-Pass `model = "v10"` for the original 7-marker panel or
-`model = "v10-fullpanel"` for the 192-marker sibling. Both share GenePT
-embeddings, so the marker vocabulary is identical between them — picking a
-model is a weights swap, not a vocab swap. Omitting `model` lets the platform
-pick (currently `v10-fullpanel`).
+Pass `model = "v0.7"` to select the current dispatchable Lattice version
+explicitly. Omitting `model` lets the platform pick the same current default.
+Older `"v0.4"` and `"v0.5"` labels can appear on historical jobs but are
+sunset for new submissions.
 
 ```{r}
-job <- strand_predict(client, upload$id, markers, model = "v10-fullpanel")
+job <- strand_predict(client, upload$id, markers, model = "v0.7")
 ```
 
 ### Fire-and-forget

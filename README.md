@@ -71,23 +71,21 @@ and `timeout_sec` / `poll_interval_sec` / `output_dir` are ignored.
 
 ### Choosing a model
 
-`strand_predict()` and `strand_run()` accept an optional `model =`. Live
-Lattice versions:
+`strand_predict()` and `strand_run()` accept an optional `model =`:
 
-- `"v0.4"` — 192-marker panel, original training.
-- `"v0.5"` — 192-marker panel, retrained (current default).
+- `"v0.7"` — current dispatchable version and default.
 
-Both share the same GenePT embeddings, so the marker vocabulary is identical
-— picking a version is a model-weights swap, not a vocab swap. Omit `model`
-(or pass `NULL`) to let the platform pick the current default (`"v0.5"`).
+Omit `model` (or pass `NULL`) to let the platform pick `"v0.7"`. The older
+`"v0.4"` and `"v0.5"` labels can appear on historical jobs but are sunset for
+new submissions.
 
 ```r
 result <- strand_run(
   client, "slide.svs",
   markers = c("CD8", "Ki67", "PanCK"),
-  model = "v0.5"
+  model = "v0.7"
 )
-result$model  # → "v0.5"
+result$model  # → "v0.7"
 ```
 
 `strand_predict_result$model` (and the `model` field on `strand_job_get()`

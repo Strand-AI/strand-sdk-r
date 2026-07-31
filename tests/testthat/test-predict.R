@@ -76,6 +76,7 @@ test_that("strand_predict forwards canonical v0.X model ids unchanged", {
     sentinel <- if (is.null(sent_model)) 1L
                 else if (identical(sent_model, "v0.4")) 4L
                 else if (identical(sent_model, "v0.5")) 5L
+                else if (identical(sent_model, "v0.7")) 7L
                 else 99L
     res$set_status(202L)$send_json(list(
       jobId = "22222222-2222-2222-2222-222222222222",
@@ -90,11 +91,17 @@ test_that("strand_predict forwards canonical v0.X model ids unchanged", {
   job <- strand_predict(client, "u-1", c("CD3"))
   expect_equal(job$reserved_credits, 1L)
 
-  # Canonical v0.4 / v0.5 → forwarded verbatim → sentinel 4/5.
+  # Canonical model ids are forwarded verbatim.
   job <- strand_predict(client, "u-1", c("CD3"), model = "v0.4")
   expect_equal(job$reserved_credits, 4L)
   job <- strand_predict(client, "u-1", c("CD3"), model = "v0.5")
   expect_equal(job$reserved_credits, 5L)
+  job <- strand_predict(client, "u-1", c("CD3"), model = "v0.7")
+  expect_equal(job$reserved_credits, 7L)
+})
+
+test_that("documented model ids include the current dispatchable version", {
+  expect_identical(STRAND_SUPPORTED_MODELS, c("v0.4", "v0.5", "v0.7"))
 })
 
 test_that("strand_predict forwards legacy v10-* strings to the server (no SDK rewrite or warning)", {

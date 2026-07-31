@@ -13,13 +13,11 @@ strand_predict(client, upload_id, markers, model = NULL)
 
 \item{markers}{Character vector of marker names (e.g. \code{c("CD3", "CD8")}).}
 
-\item{model}{Optional explicit Lattice version. One of \code{"v0.4"} (192-marker
-original) or \code{"v0.5"} (192-marker retrained, current default). Both share
-GenePT embeddings — picking a version is a model-weights swap, not a
-vocab swap. When \code{NULL} (default), the platform picks. Legacy aliases
-(\code{"v10-fullpanel"} → \code{"v0.4"}, \code{"v10-fullpanel-v2"} → \code{"v0.5"}) are still
-accepted with a deprecation warning; \code{"v10"} (which used to resolve to
-the now-sunset v0.3) warns and is rejected by the server.}
+\item{model}{Optional explicit Lattice version. \code{"v0.7"} is the current
+dispatchable version and default. \code{"v0.4"} and \code{"v0.5"} remain recognized
+identifiers for historical records, but requesting either for a new job
+returns 400 \code{model_sunset}. When \code{NULL} (default), the platform picks
+\code{"v0.7"}.}
 }
 \value{
 A \code{strand_job} list with \code{id}, \code{reserved_credits}, \code{client}.
@@ -36,6 +34,6 @@ strand_job_wait(job)
 
 # Explicitly target a specific version:
 job <- strand_predict(client, upload$id, c("CD3", "CD8"),
-                      model = "v0.5")
+                      model = "v0.7")
 }
 }

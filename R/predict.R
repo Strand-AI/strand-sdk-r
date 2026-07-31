@@ -9,7 +9,7 @@
 # through to the server, which returns 400 `unknown_model`. This list
 # stays purely as caller-facing documentation — the SDK doesn't reject
 # anything client-side, the server is the authority.
-STRAND_SUPPORTED_MODELS <- c("v0.4", "v0.5")
+STRAND_SUPPORTED_MODELS <- c("v0.4", "v0.5", "v0.7")
 
 strand_validate_model <- function(model) {
   if (is.null(model)) return(NULL)
@@ -63,12 +63,11 @@ strand_estimate <- function(client, upload_id, markers) {
 #' condition with a `required` field.
 #'
 #' @inheritParams strand_estimate
-#' @param model Optional explicit Lattice version. One of `"v0.4"` (192-marker
-#'   original) or `"v0.5"` (192-marker retrained, current default). Both share
-#'   GenePT embeddings — picking a version is a model-weights swap, not a
-#'   vocab swap. When `NULL` (default), the platform picks. The legacy
-#'   `"v10"` / `"v10-fullpanel"` / `"v10-fullpanel-v2"` ids were dropped on
-#'   2026-06-03 — the server now returns 400 `unknown_model` for any of them.
+#' @param model Optional explicit Lattice version. `"v0.7"` is the current
+#'   dispatchable version and default. `"v0.4"` and `"v0.5"` remain recognized
+#'   identifiers for historical records, but requesting either for a new job
+#'   returns 400 `model_sunset`. When `NULL` (default), the platform picks
+#'   `"v0.7"`.
 #'
 #' @return A `strand_job` list with `id`, `reserved_credits`, `client`.
 #'
@@ -79,7 +78,7 @@ strand_estimate <- function(client, upload_id, markers) {
 #'
 #' # Explicitly target a specific version:
 #' job <- strand_predict(client, upload$id, c("CD3", "CD8"),
-#'                       model = "v0.5")
+#'                       model = "v0.7")
 #' }
 #' @export
 strand_predict <- function(client, upload_id, markers, model = NULL) {
@@ -166,7 +165,7 @@ strand_coerce_markers <- function(markers) {
 #'
 #' # Choose a version explicitly:
 #' result <- strand_run(client, "biopsy.ome.tiff", c("CD8", "Ki67"),
-#'                      model = "v0.5")
+#'                      model = "v0.7")
 #'
 #' # Fire-and-forget — upload + submit only, then drive the job later:
 #' job <- strand_run(client, "biopsy.ome.tiff", c("CD8"), wait = FALSE)
