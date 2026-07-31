@@ -66,6 +66,13 @@ status <- strand_job_wait(job)
 spe <- strand_download_results(job)
 ```
 
+Cancel an in-flight job to refund its reserved credits and release the
+organization's concurrent-job slot:
+
+```r
+status <- strand_job_cancel(job)
+```
+
 When `wait = FALSE`, the `"wait"` and `"download"` progress stages don't fire,
 and `timeout_sec` / `poll_interval_sec` / `output_dir` are ignored.
 
@@ -176,7 +183,7 @@ R/
   predict.R                 strand_estimate, strand_predict (submit),
                             strand_run (full pipeline), predict.strand_client
   mpp.R                     strand_set_mpp (physical pixel-size override)
-  jobs.R                    strand_job_get + strand_job_wait
+  jobs.R                    strand_job_get + strand_job_wait + strand_job_cancel
   results.R                 strand_download_results + SpatialExperiment
 tests/testthat/             unit tests using webfakes (in-process http server)
 vignettes/quickstart.Rmd

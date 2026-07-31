@@ -38,6 +38,35 @@ strand_parse_job <- function(raw) {
   )
 }
 
+#' Cancel an in-flight job
+#'
+#' Calls `POST /api/v1/jobs/{id}/cancel`, then fetches and returns the updated
+#' job status. Cancellation refunds the reserved credits and releases the
+#' organization's concurrent-job slot. The server returns 400 if the job is
+#' already terminal.
+#'
+#' @param job A `strand_job` from [strand_predict()].
+#'
+#' @return The updated job status list with `status = "cancelled"`.
+#'
+#' @examples
+#' \dontrun{
+#' job <- strand_predict(client, upload$id, c("CD3", "CD8"))
+#' status <- strand_job_cancel(job)
+#' }
+#' @export
+strand_job_cancel <- function(job) {
+  if (!inherits(job, "strand_job")) {
+    stop("job must be a strand_job (from strand_predict())", call. = FALSE)
+  }
+  strand_perform_json(
+    job$client,
+    sprintf("jobs/%s/cancel", job$id),
+    method = "POST"
+  )
+  strand_job_get(job)
+}
+
 #' Block until a job reaches a terminal status
 #'
 #' Polls `GET /api/v1/jobs/{id}` on a fixed interval and returns the terminal
@@ -68,7 +97,7 @@ strand_job_wait <- function(job, timeout = Inf,
       message(sprintf("  status: %s%s", status$status, prog))
       last_status <- status$status
     }
-    if (status$status %in% c("completed", "failed")) {
+    if (status$status %in% c("completed", "failed", "cancelled")) {
       if (identical(status$status, "failed")) {
         msg <- status$error_message %||% sprintf("Job %s failed", job$id)
         stop(structure(list(message = msg, job_id = job$id),
