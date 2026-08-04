@@ -1,3 +1,14 @@
+# strandai 0.7.0
+
+## Added
+
+* Added `strand_samples_get()`, the first sample-read function. It returns a
+  sample's curated resource (identity, status, physical scale, tags, and the
+  expiration fields), so you can check when a sample expires — via
+  `will_expire`, `expires_in_days`, and `expires_at` — without the mutation
+  `strand_set_expiration()` requires. Previously there was no way to read a
+  sample's expiration over the API without changing it.
+
 # strandai 0.6.0
 
 ## Added
