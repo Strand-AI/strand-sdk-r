@@ -12,7 +12,7 @@ test_that("strand_samples_get parses the full sample resource", {
         fileSize = "1048576",
         widthPx = 20000L,
         heightPx = 15000L,
-        mpp = list(x = 0.5, y = 0.5),
+        mpp = 0.5,
         tags = list("cohort-a", "histowiz"),
         createdAt = "2026-01-15T12:00:00Z",
         expiresAt = "2026-12-31T00:00:00Z",
@@ -33,7 +33,7 @@ test_that("strand_samples_get parses the full sample resource", {
   expect_identical(s$status, "ready")
   expect_equal(s$file_size, 1048576)
   expect_identical(s$width_px, 20000L)
-  expect_equal(s$mpp, c(x = 0.5, y = 0.5))
+  expect_equal(s$mpp, 0.5)
   expect_identical(s$tags, c("cohort-a", "histowiz"))
   expect_identical(s$expires_at, "2026-12-31T00:00:00Z")
   expect_identical(s$expires_at_source, "custom")

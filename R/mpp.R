@@ -4,39 +4,30 @@
 #'
 #' Sets the user-reported physical pixel size at the slide's base level. This
 #' value takes precedence over embedded slide metadata for subsequent inference
-#' jobs.
+#' jobs. Slides are isotropic: a single value governs both axes.
 #'
 #' @param client A `strand_client`.
 #' @param sample_id Sample or completed-upload identifier.
-#' @param mpp_x Horizontal microns per pixel, greater than 0 and at most 100.
-#' @param mpp_y Optional vertical microns per pixel. When `NULL`, the platform
-#'   uses `mpp_x` for both axes.
+#' @param mpp Microns per pixel, greater than 0 and at most 100.
 #'
-#' @return A list with `id` and `user_mpp`, a named numeric vector containing
-#'   the normalized `x` and `y` values.
+#' @return A list with `id` and the persisted scalar `mpp`.
 #'
 #' @examples
 #' \dontrun{
 #' strand_set_mpp(client, upload$id, 0.26)
-#' strand_set_mpp(client, upload$id, 0.26, 0.25)
 #' }
 #' @export
-strand_set_mpp <- function(client, sample_id, mpp_x, mpp_y = NULL) {
-  x <- strand_validate_mpp(mpp_x, "mpp_x")
-  mpp <- if (is.null(mpp_y)) {
-    x
-  } else {
-    list(x = x, y = strand_validate_mpp(mpp_y, "mpp_y"))
-  }
+strand_set_mpp <- function(client, sample_id, mpp) {
+  value <- strand_validate_mpp(mpp, "mpp")
   raw <- strand_perform_json(
     client,
     sprintf("samples/%s/mpp", sample_id),
     method = "PATCH",
-    body = list(mpp = mpp)
+    body = list(mpp = value)
   )
   list(
     id = raw$id,
-    user_mpp = c(x = as.numeric(raw$userMpp$x), y = as.numeric(raw$userMpp$y))
+    mpp = as.numeric(raw$mpp)
   )
 }
 

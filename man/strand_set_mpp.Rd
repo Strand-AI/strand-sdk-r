@@ -4,30 +4,25 @@
 \alias{strand_set_mpp}
 \title{Set sample microns per pixel}
 \usage{
-strand_set_mpp(client, sample_id, mpp_x, mpp_y = NULL)
+strand_set_mpp(client, sample_id, mpp)
 }
 \arguments{
 \item{client}{A \code{strand_client}.}
 
 \item{sample_id}{Sample or completed-upload identifier.}
 
-\item{mpp_x}{Horizontal microns per pixel, greater than 0 and at most 100.}
-
-\item{mpp_y}{Optional vertical microns per pixel. When \code{NULL}, the platform
-uses \code{mpp_x} for both axes.}
+\item{mpp}{Microns per pixel, greater than 0 and at most 100.}
 }
 \value{
-A list with \code{id} and \code{user_mpp}, a named numeric vector containing
-the normalized \code{x} and \code{y} values.
+A list with \code{id} and the persisted scalar \code{mpp}.
 }
 \description{
 Sets the user-reported physical pixel size at the slide's base level. This
 value takes precedence over embedded slide metadata for subsequent inference
-jobs.
+jobs. Slides are isotropic: a single value governs both axes.
 }
 \examples{
 \dontrun{
 strand_set_mpp(client, upload$id, 0.26)
-strand_set_mpp(client, upload$id, 0.26, 0.25)
 }
 }

@@ -117,11 +117,11 @@ them. Pass the canonical v0.X id instead:
 ### Setting slide scale
 
 If a slide's physical pixel size is missing or incorrect, set the base-level
-microns per pixel before submitting a job. Omit `mpp_y` for isotropic pixels:
+microns per pixel before submitting a job. Slides are isotropic, so a single
+value governs both axes:
 
 ```r
 strand_set_mpp(client, upload$id, 0.26)
-strand_set_mpp(client, upload$id, 0.26, 0.25)
 ```
 
 The user-reported value takes precedence over embedded slide metadata for

@@ -54,9 +54,10 @@ strand_samples_get <- function(client, sample_id) {
     file_size <- if (is.na(coerced)) NULL else coerced
   }
 
+  # Slides are isotropic: `mpp` is a single scalar (or null/absent).
   mpp <- NULL
-  if (!is.null(raw$mpp) && !is.null(raw$mpp$x) && !is.null(raw$mpp$y)) {
-    mpp <- c(x = as.numeric(raw$mpp$x), y = as.numeric(raw$mpp$y))
+  if (!is.null(raw$mpp) && is.numeric(raw$mpp) && length(raw$mpp) == 1L) {
+    mpp <- as.numeric(raw$mpp)
   }
 
   list(
