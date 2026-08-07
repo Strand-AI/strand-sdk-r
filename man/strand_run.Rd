@@ -13,7 +13,8 @@ strand_run(
   timeout_sec = 1800,
   output_dir = NULL,
   poll_interval_sec = 5,
-  on_progress = NULL
+  on_progress = NULL,
+  auto_segment = NULL
 )
 }
 \arguments{
@@ -46,6 +47,10 @@ OME-Zarr result store is mirrored under this directory.}
 \code{"upload"} and \code{"submit"} fire when \code{wait = FALSE}). \code{fraction} is always
 a numeric in \verb{[0, 1]} — \code{0} at the start of each stage and \code{1} at its end,
 with intermediate values where the underlying step exposes progress.}
+
+\item{auto_segment}{Opt out of automatic cell segmentation for the uploaded
+slide. \code{NULL} (default) uses the org default; \code{FALSE} skips segmentation;
+\code{TRUE} forces it on. Passed through to \code{\link[=strand_upload_file]{strand_upload_file()}}.}
 }
 \value{
 When \code{wait = TRUE}, a list with class \code{strand_predict_result}

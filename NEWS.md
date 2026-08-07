@@ -1,3 +1,15 @@
+# strandai 0.8.0
+
+## Added
+
+* Added an `auto_segment` argument to `strand_upload_file()` and `strand_run()`
+  (and thus `predict()`). Cell segmentation still runs on ingest by default;
+  pass `auto_segment = FALSE` to skip it for that upload (the slide is still
+  ingested and rendered), or `TRUE` to force it even when the org default is
+  off. `NULL` (the default) defers to the org's default. The resolved value is
+  surfaced as `auto_segment` on the `strand_upload` returned by
+  `strand_uploads_get()` / `strand_uploads_list()`.
+
 # strandai 0.7.0
 
 ## Added

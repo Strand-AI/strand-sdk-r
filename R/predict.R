@@ -145,6 +145,9 @@ strand_coerce_markers <- function(markers) {
 #'   `"upload"` and `"submit"` fire when `wait = FALSE`). `fraction` is always
 #'   a numeric in `[0, 1]` — `0` at the start of each stage and `1` at its end,
 #'   with intermediate values where the underlying step exposes progress.
+#' @param auto_segment Opt out of automatic cell segmentation for the uploaded
+#'   slide. `NULL` (default) uses the org default; `FALSE` skips segmentation;
+#'   `TRUE` forces it on. Passed through to [strand_upload_file()].
 #'
 #' @return When `wait = TRUE`, a list with class `strand_predict_result`
 #'   containing: `job_id`, `status`, `credits_used`, `marker_outputs` (named
@@ -182,7 +185,8 @@ strand_run <- function(client, image_path, markers,
                        timeout_sec = 1800,
                        output_dir = NULL,
                        poll_interval_sec = 5,
-                       on_progress = NULL) {
+                       on_progress = NULL,
+                       auto_segment = NULL) {
   if (!inherits(client, "strand_client")) {
     stop("client must be a strand_client (see strand_client())", call. = FALSE)
   }
@@ -195,7 +199,7 @@ strand_run <- function(client, image_path, markers,
   report <- if (is.function(on_progress)) on_progress else function(stage, fraction) invisible(NULL)
 
   report("upload", 0)
-  upload <- strand_upload_file(client, image_path)
+  upload <- strand_upload_file(client, image_path, auto_segment = auto_segment)
   report("upload", 1)
 
   # From here on the upload is durable on the platform; if anything downstream

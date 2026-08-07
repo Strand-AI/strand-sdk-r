@@ -109,6 +109,76 @@ test_that("strand_uploads_get returns a strand_upload row", {
 })
 
 
+test_that("strand_uploads_get surfaces auto_segment", {
+  skip_if_no_webfakes()
+  app <- webfakes::new_app()
+  app$get("/api/v1/uploads/:id", function(req, res) {
+    res$send_json(list(
+      id = req$params$id,
+      filename = "slide.svs",
+      fileSize = "256",
+      status = "ready",
+      gcsPath = "uploads/org/aa/slide.svs",
+      createdAt = "2026-08-06T10:00:00Z",
+      widthPx = 100L,
+      heightPx = 200L,
+      autoSegment = FALSE
+    ), auto_unbox = TRUE)
+  })
+  server <- start_strand_server(app)
+  client <- testing_client(server)
+
+  u <- strand_uploads_get(client, "11111111-1111-1111-1111-111111111111")
+  expect_false(u$auto_segment)
+})
+
+
+test_that("strand_upload_file forwards auto_segment on the init body", {
+  f <- tempfile(fileext = ".svs")
+  on.exit(unlink(f), add = TRUE)
+  writeBin(as.raw(rep(0L, 1024L)), f)
+  client <- strand_client(api_key = "x", base_url = "http://127.0.0.1:1")
+
+  captured <- new.env(parent = emptyenv())
+  local_mocked_bindings(
+    strand_perform_json = function(client, path, ...) {
+      args <- list(...)
+      if (identical(path, "uploads")) {
+        captured$body <- args$body
+        return(list(uploadId = "u-1", uploadUrl = "http://x/gcs", gcsPath = "p"))
+      }
+      list(status = "preprocessing", widthPx = 1L, heightPx = 1L)
+    },
+    strand_stream_to_gcs = function(...) invisible(NULL)
+  )
+
+  # FALSE is forwarded...
+  strand_upload_file(client, f, auto_segment = FALSE)
+  expect_true("autoSegment" %in% names(captured$body))
+  expect_false(captured$body$autoSegment)
+
+  # ...TRUE is forwarded...
+  strand_upload_file(client, f, auto_segment = TRUE)
+  expect_true(captured$body$autoSegment)
+
+  # ...and NULL (default) omits the key so the org default applies server-side.
+  strand_upload_file(client, f)
+  expect_false("autoSegment" %in% names(captured$body))
+})
+
+
+test_that("strand_upload_file rejects a non-logical auto_segment", {
+  f <- tempfile(fileext = ".svs")
+  on.exit(unlink(f), add = TRUE)
+  writeBin(as.raw(rep(0L, 1024L)), f)
+  client <- strand_client(api_key = "x", base_url = "http://127.0.0.1:1")
+
+  expect_error(strand_upload_file(client, f, auto_segment = "yes"), "auto_segment")
+  expect_error(strand_upload_file(client, f, auto_segment = c(TRUE, FALSE)), "auto_segment")
+  expect_error(strand_upload_file(client, f, auto_segment = NA), "auto_segment")
+})
+
+
 test_that("strand_uploads_get maps 404 to strand_not_found_error", {
   skip_if_no_webfakes()
   app <- webfakes::new_app()

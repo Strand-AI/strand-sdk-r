@@ -15,6 +15,10 @@
 #' @param chunk_size Bytes per chunk. Must be a positive multiple of 256 KiB
 #'   (the GCS resumable upload requirement). Defaults to 8 MiB.
 #' @param progress If `TRUE`, prints upload progress to the console.
+#' @param auto_segment Opt out of automatic cell segmentation for this upload.
+#'   `NULL` (default) uses the org's default; `FALSE` skips segmentation (the
+#'   slide is still ingested and rendered); `TRUE` forces it on even when the
+#'   org default is off.
 #'
 #' @return A list with class `strand_upload` containing `id`, `gcs_path`,
 #'   `upload_url`, `width_px`, `height_px`, `status`.
@@ -28,7 +32,8 @@
 strand_upload_file <- function(client, path,
                                content_type = NULL,
                                chunk_size = 8L * 1024L * 1024L,
-                               progress = FALSE) {
+                               progress = FALSE,
+                               auto_segment = NULL) {
   if (!inherits(client, "strand_client")) {
     stop("client must be a strand_client (see strand_client())", call. = FALSE)
   }
@@ -39,14 +44,21 @@ strand_upload_file <- function(client, path,
       chunk_size %% (256L * 1024L) != 0) {
     stop("chunk_size must be a positive multiple of 256 KiB.", call. = FALSE)
   }
+  if (!is.null(auto_segment) &&
+      (!is.logical(auto_segment) || length(auto_segment) != 1L || is.na(auto_segment))) {
+    stop("auto_segment must be TRUE, FALSE, or NULL.", call. = FALSE)
+  }
 
   size <- file.info(path)$size
   filename <- basename(path)
   ct <- content_type %||% strand_guess_content_type(path)
 
+  init_body <- list(filename = filename, fileSize = size, contentType = ct)
+  if (!is.null(auto_segment)) init_body$autoSegment <- auto_segment
+
   session <- strand_perform_json(
     client, "uploads", method = "POST",
-    body = list(filename = filename, fileSize = size, contentType = ct)
+    body = init_body
   )
 
   strand_stream_to_gcs(session$uploadUrl, path, size, ct,
@@ -228,6 +240,7 @@ strand_parse_upload_row <- function(raw) {
       gcs_path = strand_as_scalar_chr(raw$gcsPath),
       width_px = strand_as_scalar_int(raw$widthPx),
       height_px = strand_as_scalar_int(raw$heightPx),
+      auto_segment = strand_as_scalar_lgl(raw$autoSegment),
       created_at = strand_as_scalar_chr(raw$createdAt)
     ),
     class = "strand_upload"
@@ -244,6 +257,12 @@ strand_as_scalar_int <- function(x) {
   if (is.null(x) || length(x) == 0L) return(NULL)
   if (!is.numeric(x[[1L]])) return(NULL)
   as.integer(x[[1L]])
+}
+
+strand_as_scalar_lgl <- function(x) {
+  if (is.null(x) || length(x) == 0L) return(NULL)
+  if (!is.logical(x[[1L]])) return(NULL)
+  as.logical(x[[1L]])
 }
 
 strand_guess_content_type <- function(path) {

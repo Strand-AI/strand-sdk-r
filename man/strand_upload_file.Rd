@@ -9,7 +9,8 @@ strand_upload_file(
   path,
   content_type = NULL,
   chunk_size = 8L * 1024L * 1024L,
-  progress = FALSE
+  progress = FALSE,
+  auto_segment = NULL
 )
 }
 \arguments{
@@ -23,6 +24,11 @@ strand_upload_file(
 (the GCS resumable upload requirement). Defaults to 8 MiB.}
 
 \item{progress}{If \code{TRUE}, prints upload progress to the console.}
+
+\item{auto_segment}{Opt out of automatic cell segmentation for this upload.
+\code{NULL} (default) uses the org's default; \code{FALSE} skips segmentation (the
+slide is still ingested and rendered); \code{TRUE} forces it on even when the
+org default is off.}
 }
 \value{
 A list with class \code{strand_upload} containing \code{id}, \code{gcs_path},
