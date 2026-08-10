@@ -41,9 +41,8 @@ strand_parse_job <- function(raw) {
 #' Cancel an in-flight job
 #'
 #' Calls `POST /api/v1/jobs/{id}/cancel`, then fetches and returns the updated
-#' job status. Cancellation refunds the reserved credits and releases the
-#' organization's concurrent-job slot. The server returns 400 if the job is
-#' already terminal.
+#' job status. Cancellation refunds the reserved credits. The server returns
+#' 400 if the job is already terminal.
 #'
 #' @param job A `strand_job` from [strand_predict()].
 #'

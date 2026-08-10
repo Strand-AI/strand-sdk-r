@@ -122,9 +122,6 @@ tryCatch(
   strand_predict(client, upload$id, markers),
   strand_insufficient_credits_error = function(e) {
     message("Need ", e$required, " more credits.")
-  },
-  strand_rate_limit_error = function(e) {
-    message("Org over the concurrent-job cap; retry in ", e$retry_after, "s.")
   }
 )
 ```

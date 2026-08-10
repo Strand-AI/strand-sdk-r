@@ -59,7 +59,6 @@ strand_raise_for_error <- function(resp) {
            "401" = "strand_auth_error",
            "402" = "strand_insufficient_credits_error",
            "404" = "strand_not_found_error",
-           "429" = "strand_rate_limit_error",
            NULL),
     "strand_api_error", "error", "condition"
   )
@@ -80,14 +79,5 @@ strand_raise_for_error <- function(resp) {
   if (status == 402L) {
     cond$required <- body$required
   }
-  if (status == 429L) {
-    retry_after <- httr2::resp_header(resp, "Retry-After")
-    if (!is.null(retry_after) && !is.na(suppressWarnings(as.integer(retry_after)))) {
-      cond$retry_after <- as.integer(retry_after)
-    } else {
-      cond$retry_after <- NA_integer_
-    }
-  }
-
   stop(structure(cond, class = cls))
 }

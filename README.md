@@ -68,8 +68,7 @@ spe <- strand_download_results(job)
 strand_download_ome_tiff(job, "result.ome.tiff", progress = TRUE)
 ```
 
-Cancel an in-flight job to refund its reserved credits and release the
-organization's concurrent-job slot:
+Cancel an in-flight job to refund its reserved credits:
 
 ```r
 status <- strand_job_cancel(job)
@@ -161,16 +160,12 @@ Documented HTTP error codes are mapped to typed conditions:
 | 401 | `strand_auth_error` |
 | 402 | `strand_insufficient_credits_error` (carries `required`) |
 | 404 | `strand_not_found_error` |
-| 429 | `strand_rate_limit_error` (carries `retry_after`) |
 
 ```r
 tryCatch(
   strand_predict(client, upload$id, markers),
   strand_insufficient_credits_error = function(e) {
     message("Need ", e$required, " credits — top up the org first.")
-  },
-  strand_rate_limit_error = function(e) {
-    message("Wait ", e$retry_after, "s before retrying.")
   }
 )
 ```

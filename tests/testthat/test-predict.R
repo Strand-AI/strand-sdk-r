@@ -188,24 +188,3 @@ test_that("strand_predict rejects only structurally-invalid model args", {
   expect_error(strand_predict(client, "u-1", c("CD3"), model = NA_character_),
                "non-empty")
 })
-
-test_that("429 maps to strand_rate_limit_error with retry_after", {
-  skip_if_no_webfakes()
-  app <- webfakes::new_app()
-  app$post("/api/v1/predict", function(req, res) {
-    res$set_header("Retry-After", "30")
-    res$set_status(429L)$send_json(list(
-      error = "rate_limited",
-      message = "Concurrent cap exceeded"
-    ), auto_unbox = TRUE)
-  })
-  server <- start_strand_server(app)
-  client <- testing_client(server)
-
-  err <- tryCatch(
-    strand_predict(client, "u-1", c("CD3")),
-    strand_rate_limit_error = function(e) e
-  )
-  expect_s3_class(err, "strand_rate_limit_error")
-  expect_equal(err$retry_after, 30L)
-})
