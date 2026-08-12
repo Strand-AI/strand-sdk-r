@@ -16,7 +16,12 @@ strand_job_wait(job, timeout = Inf, poll_interval = 2, progress = FALSE)
 \item{progress}{If \code{TRUE}, prints a one-line status update per poll.}
 }
 \value{
-The terminal job status list.
+The terminal job status list. \code{status = "completed"} means every
+requested marker delivered; \code{"partial_failed"} means some markers
+delivered (results are downloadable) and the rest terminally failed after
+server-side retries — it returns normally rather than erroring, so check
+\verb{$status}. Only a \code{"failed"} terminal status (nothing delivered) raises a
+\code{strand_job_failed_error}.
 }
 \description{
 Polls \code{GET /api/v1/jobs/{id}} on a fixed interval and returns the terminal

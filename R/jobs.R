@@ -78,7 +78,12 @@ strand_job_cancel <- function(job) {
 #' @param poll_interval Seconds between status polls.
 #' @param progress If `TRUE`, prints a one-line status update per poll.
 #'
-#' @return The terminal job status list.
+#' @return The terminal job status list. `status = "completed"` means every
+#'   requested marker delivered; `"partial_failed"` means some markers
+#'   delivered (results are downloadable) and the rest terminally failed after
+#'   server-side retries — it returns normally rather than erroring, so check
+#'   `$status`. Only a `"failed"` terminal status (nothing delivered) raises a
+#'   `strand_job_failed_error`.
 #'
 #' @export
 strand_job_wait <- function(job, timeout = Inf,
@@ -96,7 +101,7 @@ strand_job_wait <- function(job, timeout = Inf,
       message(sprintf("  status: %s%s", status$status, prog))
       last_status <- status$status
     }
-    if (status$status %in% c("completed", "failed", "cancelled")) {
+    if (status$status %in% c("completed", "partial_failed", "failed", "cancelled")) {
       if (identical(status$status, "failed")) {
         msg <- status$error_message %||% sprintf("Job %s failed", job$id)
         stop(structure(list(message = msg, job_id = job$id),
