@@ -52,12 +52,15 @@ strand_raise_for_error <- function(resp) {
   message <- body$message %||% body$error %||% sprintf("HTTP %d", status)
   error_code <- if (is.character(body$error)) body$error else NA_character_
   is_unknown_markers <- status == 400L && identical(error_code, "unknown_markers")
+  is_marker_not_available <- status == 403L && identical(error_code, "marker_not_available")
   cls <- c(
     if (is_unknown_markers) "strand_unknown_markers_error" else NULL,
+    if (is_marker_not_available) "strand_marker_not_available_error" else NULL,
     switch(as.character(status),
            "400" = "strand_bad_request_error",
            "401" = "strand_auth_error",
            "402" = "strand_insufficient_credits_error",
+           "403" = "strand_forbidden_error",
            "404" = "strand_not_found_error",
            NULL),
     "strand_api_error", "error", "condition"
@@ -75,6 +78,12 @@ strand_raise_for_error <- function(resp) {
     known_raw <- body$knownMarkersSample
     cond$known_subset <- if (is.null(known_raw)) NULL
                          else vapply(known_raw, as.character, character(1))
+  }
+  if (is_marker_not_available) {
+    cond$unavailable <- vapply(body$unavailableMarkers %||% list(), as.character, character(1))
+    available_raw <- body$availableMarkers
+    cond$available <- if (is.null(available_raw)) NULL
+                      else vapply(available_raw, as.character, character(1))
   }
   if (status == 402L) {
     cond$required <- body$required
