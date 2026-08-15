@@ -1,11 +1,11 @@
 Package: strandai
 Type: Package
-Title: Client for the Strand Platform API
+Title: Client for the Strand AI Platform API
 Version: 0.8.0
 Authors@R: c(
     person("Strand AI", role = c("aut", "cre", "cph"),
            email = "support@strandai.com"))
-Description: R client for the Strand Platform 'REST' API. Provides functions to
+Description: R client for the Strand AI Platform 'REST' API. Provides functions to
     upload Whole Slide Images via 'GCS' resumable upload, submit 'Lattice' H&E
     to multiplex protein inference jobs, and download 'OME-Zarr' predictions as
     'SpatialExperiment' objects from Bioconductor. Designed for spatial-omics

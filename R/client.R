@@ -1,6 +1,6 @@
-# Strand Platform R client — top-level constructor.
+# Strand AI Platform R client — top-level constructor.
 
-#' Create a Strand Platform client
+#' Create a Strand AI Platform client
 #'
 #' Constructs a client object that bundles authentication, base URL, and
 #' a shared `httr2` request template. The returned list is passed to every

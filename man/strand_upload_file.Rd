@@ -2,7 +2,7 @@
 % Please edit documentation in R/uploads.R
 \name{strand_upload_file}
 \alias{strand_upload_file}
-\title{Upload a Whole Slide Image to the Strand Platform}
+\title{Upload a Whole Slide Image to the Strand AI Platform}
 \usage{
 strand_upload_file(
   client,

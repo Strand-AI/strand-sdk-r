@@ -23,7 +23,7 @@ A named list with \code{items} (a list of per-sample lists carrying
 \code{page}, \code{page_size}, \code{total_count}, and \code{total_pages} integers.
 }
 \description{
-List Strand's curated public cohort (paginated, newest-first). Available to
+List Strand AI's curated public cohort (paginated, newest-first). Available to
 any authenticated client for free — the cohort is org-independent, so you
 read it regardless of your own org, and no read spends credits.
 }

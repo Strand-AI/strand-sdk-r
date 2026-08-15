@@ -134,7 +134,7 @@ strand_set_expiration_bulk(client, c(id1, id2), expires_at = date)
 
 # strandai 0.1.0
 
-Initial public release of the R client for the Strand Platform API.
+Initial public release of the R client for the Strand AI Platform API.
 
 * `strand_client()` — construct a client; reads `STRAND_API_KEY` and
   `STRAND_BASE_URL` from the environment.

@@ -1,6 +1,6 @@
 # Public-cohort reads. Mirrors GET /api/v1/public/samples[/{publicId}].
 #
-# Any authenticated client may browse and read Strand's curated public cohort
+# Any authenticated client may browse and read Strand AI's curated public cohort
 # (the TCGA release) for free — it is org-independent, and no read spends
 # credits. Generation stays credit-gated on strand_predict()/strand_upload_file().
 
@@ -13,7 +13,7 @@
 
 #' List the public cohort
 #'
-#' List Strand's curated public cohort (paginated, newest-first). Available to
+#' List Strand AI's curated public cohort (paginated, newest-first). Available to
 #' any authenticated client for free — the cohort is org-independent, so you
 #' read it regardless of your own org, and no read spends credits.
 #'

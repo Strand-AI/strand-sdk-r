@@ -1,8 +1,8 @@
 ---
-title: "Strand Platform Quickstart"
+title: "Strand AI Platform Quickstart"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Strand Platform Quickstart}
+  %\VignetteIndexEntry{Strand AI Platform Quickstart}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-This vignette walks end-to-end through the [Strand Platform](https://strandai.com)
+This vignette walks end-to-end through the [Strand AI Platform](https://strandai.com)
 API using the `strand` R package: upload a Whole Slide Image (WSI), submit a
 Lattice H&E to multiplex protein inference job, wait for completion, and pull
 results back as a `SpatialExperiment`.

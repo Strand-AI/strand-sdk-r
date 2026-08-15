@@ -32,7 +32,7 @@ A list with \code{updated} (integer count) and \code{batchId} (UUID).
 }
 \description{
 All-or-nothing: if any sample fails the permission gate (caller is not
-the sample creator, an org owner/admin, or a Strand admin), the whole
+the sample creator, an org owner/admin, or a Strand AI admin), the whole
 call returns a 403 with no rows touched.
 }
 \examples{

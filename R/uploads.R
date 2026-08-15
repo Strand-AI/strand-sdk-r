@@ -1,6 +1,6 @@
 # Resumable upload of a WSI file.
 
-#' Upload a Whole Slide Image to the Strand Platform
+#' Upload a Whole Slide Image to the Strand AI Platform
 #'
 #' Performs the three-step resumable upload flow:
 #' \enumerate{

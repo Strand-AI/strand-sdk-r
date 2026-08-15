@@ -1,6 +1,6 @@
-#' strandai: Client for the Strand Platform API
+#' strandai: Client for the Strand AI Platform API
 #'
-#' R client for the Strand Platform REST API. Provides functions to upload
+#' R client for the Strand AI Platform REST API. Provides functions to upload
 #' Whole Slide Images via GCS resumable upload, submit Lattice H&E to
 #' multiplex protein inference jobs, and download OME-Zarr predictions as
 #' SpatialExperiment objects.

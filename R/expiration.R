@@ -79,7 +79,7 @@ strand_set_expiration <- function(client, sample_id,
 #' Set expiration on a batch of samples (max 500)
 #'
 #' All-or-nothing: if any sample fails the permission gate (caller is not
-#' the sample creator, an org owner/admin, or a Strand admin), the whole
+#' the sample creator, an org owner/admin, or a Strand AI admin), the whole
 #' call returns a 403 with no rows touched.
 #'
 #' @inheritParams strand_set_expiration

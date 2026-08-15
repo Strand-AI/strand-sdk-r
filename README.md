@@ -1,6 +1,6 @@
 # strandai
 
-R client for the [Strand Platform](https://strandai.com): upload H&E
+R client for the [Strand AI Platform](https://strandai.com): upload H&E
 whole-slide images, run virtual multiplex-immunofluorescence inference
 (H&E → spatial proteomics), and download per-marker predictions as a
 `SpatialExperiment` or OME-Zarr/OME-TIFF. Functions use the `strand_*`
@@ -48,7 +48,7 @@ error handling — is covered in the
 File bug reports and feature requests at
 [Strand-AI/strand-sdk-r/issues](https://github.com/Strand-AI/strand-sdk-r/issues),
 or email [support@strandai.com](mailto:support@strandai.com). This repository
-is a generated, read-only mirror of Strand's monorepo — pull requests opened
+is a generated, read-only mirror of Strand AI's monorepo — pull requests opened
 here are overwritten by the next sync.
 
 ## License

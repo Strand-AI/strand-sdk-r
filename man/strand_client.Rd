@@ -2,7 +2,7 @@
 % Please edit documentation in R/client.R
 \name{strand_client}
 \alias{strand_client}
-\title{Create a Strand Platform client}
+\title{Create a Strand AI Platform client}
 \usage{
 strand_client(api_key = NULL, base_url = NULL, timeout = 60, user_agent = NULL)
 }
