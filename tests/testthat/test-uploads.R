@@ -133,7 +133,7 @@ test_that("strand_uploads_get surfaces auto_segment", {
 })
 
 
-test_that("strand_upload_file forwards auto_segment on the init body", {
+test_that("strand_upload_file forwards creation-time options on the init body", {
   f <- tempfile(fileext = ".svs")
   on.exit(unlink(f), add = TRUE)
   writeBin(as.raw(rep(0L, 1024L)), f)
@@ -147,7 +147,11 @@ test_that("strand_upload_file forwards auto_segment on the init body", {
         captured$body <- args$body
         return(list(uploadId = "u-1", uploadUrl = "http://x/gcs", gcsPath = "p"))
       }
-      list(status = "preprocessing", widthPx = 1L, heightPx = 1L)
+      list(
+        id = "u-1", filename = basename(f), fileSize = "1024",
+        status = "preprocessing", gcsPath = "p", createdAt = NULL,
+        widthPx = 1L, heightPx = 1L
+      )
     },
     strand_stream_to_gcs = function(...) invisible(NULL)
   )
@@ -161,13 +165,18 @@ test_that("strand_upload_file forwards auto_segment on the init body", {
   strand_upload_file(client, f, auto_segment = TRUE)
   expect_true(captured$body$autoSegment)
 
-  # ...and NULL (default) omits the key so the org default applies server-side.
+  # Creation-time MPP is preserved on the upload-init request.
+  strand_upload_file(client, f, mpp = 0.2634)
+  expect_equal(captured$body$mpp, 0.2634)
+
+  # NULL defaults omit both keys so server-side metadata/defaults apply.
   strand_upload_file(client, f)
   expect_false("autoSegment" %in% names(captured$body))
+  expect_false("mpp" %in% names(captured$body))
 })
 
 
-test_that("strand_upload_file rejects a non-logical auto_segment", {
+test_that("strand_upload_file rejects invalid creation-time options", {
   f <- tempfile(fileext = ".svs")
   on.exit(unlink(f), add = TRUE)
   writeBin(as.raw(rep(0L, 1024L)), f)
@@ -176,6 +185,9 @@ test_that("strand_upload_file rejects a non-logical auto_segment", {
   expect_error(strand_upload_file(client, f, auto_segment = "yes"), "auto_segment")
   expect_error(strand_upload_file(client, f, auto_segment = c(TRUE, FALSE)), "auto_segment")
   expect_error(strand_upload_file(client, f, auto_segment = NA), "auto_segment")
+  expect_error(strand_upload_file(client, f, mpp = 0), "mpp")
+  expect_error(strand_upload_file(client, f, mpp = 101), "mpp")
+  expect_error(strand_upload_file(client, f, mpp = c(0.25, 0.25)), "mpp")
 })
 
 

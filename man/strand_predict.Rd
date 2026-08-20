@@ -2,9 +2,9 @@
 % Please edit documentation in R/predict.R
 \name{strand_predict}
 \alias{strand_predict}
-\title{Submit a prediction job}
+\title{Price or submit a prediction}
 \usage{
-strand_predict(client, upload_id, markers, model = NULL)
+strand_predict(client, upload_id, markers, model = NULL, dry_run = FALSE)
 }
 \arguments{
 \item{client}{A \code{strand_client}.}
@@ -18,21 +18,31 @@ dispatchable version and default. \code{"v0.4"} and \code{"v0.5"} remain recogni
 identifiers for historical records, but requesting either for a new job
 returns 400 \code{model_sunset}. When \code{NULL} (default), the platform picks
 \code{"v0.7"}.}
+
+\item{dry_run}{When \code{TRUE}, price the request without reserving credits or
+creating a job. Must be one non-missing logical value.}
 }
 \value{
-A \code{strand_job} list with \code{id}, \code{reserved_credits}, \code{client}.
+With \code{dry_run = FALSE}, a \code{strand_job} list with \code{id},
+\code{reserved_credits}, and \code{client}. With \code{dry_run = TRUE}, a list with
+\code{dry_run = TRUE}, \code{patch_count}, \code{marker_count}, \code{estimated_credits},
+\code{org_balance}, and \code{org_pending}.
 }
 \description{
-Calls \code{POST /api/v1/predict}. Atomically reserves credits in the same
-transaction; on insufficient balance raises a \code{strand_insufficient_credits_error}
-condition with a \code{required} field.
+Calls \code{POST /api/v1/predict}. The default mode atomically reserves credits
+and creates a job. With \code{dry_run = TRUE}, the same marker, model, and sample
+validation runs without reserving credits or creating a job.
 }
 \examples{
 \dontrun{
+estimate <- strand_predict(
+  client, upload$id, c("CD3", "CD8"), dry_run = TRUE
+)
+message("approximately ", estimate$estimated_credits, " credits")
+
 job <- strand_predict(client, upload$id, c("CD3", "CD8"))
 strand_job_wait(job)
 
-# Explicitly target a specific version:
 job <- strand_predict(client, upload$id, c("CD3", "CD8"),
                       model = "v0.7")
 }

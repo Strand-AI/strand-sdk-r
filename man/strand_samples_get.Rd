@@ -9,44 +9,30 @@ strand_samples_get(client, sample_id)
 \arguments{
 \item{client}{A \code{strand_client} from \code{\link[=strand_client]{strand_client()}}.}
 
-\item{sample_id}{UUID of the sample.}
+\item{sample_id}{Owned sample UUID or public share UUID.}
 }
 \value{
-A named list describing the sample:
-\describe{
-\item{id}{Sample UUID.}
-\item{name}{Display name, or \code{NULL} if unset.}
-\item{filename}{Original uploaded filename.}
-\item{status}{Lifecycle status (\code{"uploading"}, \code{"preprocessing"},
-\code{"ready"}, \code{"preprocess_failed"}).}
-\item{file_size}{Uploaded file size in bytes (numeric), or \code{NULL}.}
-\item{width_px, height_px}{Level-0 dimensions in pixels, or \code{NULL}
-before the dimensions probe completes.}
-\item{mpp}{Effective microns per pixel as a named numeric vector
-\code{c(x, y)}, or \code{NULL} when the sample has no usable scale yet.}
-\item{tags}{Character vector of canonical tags (possibly empty).}
-\item{created_at}{ISO 8601 creation timestamp.}
-\item{expires_at}{ISO 8601 timestamp the sample moves to Trash, or
-\code{NULL} if it never expires.}
-\item{expires_at_source}{\code{"org_default"}, \code{"custom"}, or \code{NULL}.}
-\item{expires_in_days}{Whole days until expiry (clamped at 0 once
-reached), or \code{NULL} if it never expires.}
-\item{will_expire}{\code{TRUE} when an expiration date is set.}
-\item{trashed_at}{ISO 8601 timestamp the sample entered Trash, or
-\code{NULL} if it is still active.}
-}
+For an owned sample, a named list with \code{ownership = "mine"}, sample
+identity and lifecycle fields, \code{jobs}, and \code{job_count}. Each job contains
+\code{id}, \code{status}, \code{progress}, \code{reserved_credits}, \code{markers}, timestamps,
+\code{error_message}, and \code{results_available}. For a public sample, a named list
+with \code{ownership = "public"}, canonical share \code{id}, \code{title}, \code{tags}, public
+\code{metadata}, \code{geometry}, \code{markers}, \code{thumbnail_url}, and \code{pyramid_url}.
 }
 \description{
-Fetch a sample's curated resource: identity, status, physical scale, tags,
-and its current expiration. This is the read-only way to check when a
-sample expires (via \code{will_expire} / \code{expires_in_days} / \code{expires_at})
-before it moves to Trash, without the mutation \code{strand_set_expiration()}
-requires. Any API key whose org owns the sample can read it.
+Fetches either an owned sample by sample id or a public sample by share id.
+The mandatory \code{ownership} field identifies the returned branch. Owned
+samples include up to the 50 newest inference jobs and the uncapped
+\code{job_count}; public samples never expose job history.
 }
 \examples{
 \dontrun{
 client <- strand_client()
-s <- strand_samples_get(client, sample_id)
-if (s$will_expire) message("expires in ", s$expires_in_days, " days")
+sample <- strand_samples_get(client, sample_id)
+if (sample$ownership == "mine") {
+  message(sample$job_count, " inference jobs")
+} else {
+  print(sample$markers)
+}
 }
 }

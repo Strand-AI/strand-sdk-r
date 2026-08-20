@@ -17,6 +17,72 @@ test_that("strand_predict returns a strand_job with reserved credits", {
   expect_equal(job$reserved_credits, 300L)
 })
 
+test_that("strand_predict dry_run sends dryRun true and parses the estimate", {
+  skip_if_no_webfakes()
+  app <- webfakes::new_app()
+  app$use(webfakes::mw_json())
+  app$post("/api/v1/predict", function(req, res) {
+    if (identical(req$json$dryRun, TRUE)) {
+      res$set_status(200L)$send_json(list(
+        dryRun = TRUE,
+        patchCount = if (is.list(req$json$markers)) 42L else 9999L,
+        markerCount = length(req$json$markers),
+        estimatedCredits = 126L,
+        orgBalance = 1000L,
+        orgPending = if (identical(req$json$model, "v0.7")) 12L else 999L
+      ), auto_unbox = TRUE)
+    } else {
+      res$set_status(202L)$send_json(list(
+        jobId = "22222222-2222-2222-2222-222222222222",
+        reservedCredits = if (
+          !is.list(req$json$markers) || "dryRun" %in% names(req$json)
+        ) 999L else 300L,
+        status = "queued"
+      ), auto_unbox = TRUE)
+    }
+  })
+  server <- start_strand_server(app)
+  client <- testing_client(server)
+
+  estimate <- strand_predict(
+    client, "u-1", "CD3", model = "v0.7", dry_run = TRUE
+  )
+  expect_identical(estimate$dry_run, TRUE)
+  expect_equal(estimate$patch_count, 42L)
+  expect_equal(estimate$marker_count, 1L)
+  expect_equal(estimate$estimated_credits, 126L)
+  expect_equal(estimate$org_balance, 1000L)
+  expect_equal(estimate$org_pending, 12L)
+  expect_false(inherits(estimate, "strand_job"))
+
+  job <- strand_predict(client, "u-1", "CD3")
+  expect_s3_class(job, "strand_job")
+  expect_equal(job$reserved_credits, 300L)
+
+  explicit_false <- strand_predict(client, "u-1", "CD3", dry_run = FALSE)
+  expect_s3_class(explicit_false, "strand_job")
+  expect_equal(explicit_false$reserved_credits, 300L)
+})
+
+test_that("strand_predict validates dry_run before HTTP", {
+  client <- strand_client(api_key = "sk-strand-test", base_url = "http://127.0.0.1:1")
+  for (dry_run in list(NA, NULL, "true", 1, c(TRUE, FALSE))) {
+    expect_error(
+      strand_predict(client, "u-1", "CD3", dry_run = dry_run),
+      "dry_run must be TRUE or FALSE"
+    )
+  }
+})
+
+test_that("empty markers vector is rejected in both prediction modes", {
+  client <- strand_client(api_key = "x", base_url = "http://127.0.0.1:1")
+  expect_error(strand_predict(client, "u", character(0)), "at least one")
+  expect_error(
+    strand_predict(client, "u", c("", "  "), dry_run = TRUE),
+    "at least one"
+  )
+})
+
 test_that("402 maps to strand_insufficient_credits_error with required", {
   skip_if_no_webfakes()
   app <- webfakes::new_app()

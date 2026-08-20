@@ -17,7 +17,7 @@ SpatialExperiment objects.
 \if{html}{\out{<div class="sourceCode">}}\preformatted{library(strandai)
 client <- strand_client()  # reads STRAND_API_KEY
 upload <- strand_upload_file(client, "slide.svs")
-est <- strand_estimate(client, upload$id, c("CD3", "CD8"))
+est <- strand_predict(client, upload$id, c("CD3", "CD8"), dry_run = TRUE)
 job <- strand_predict(client, upload$id, c("CD3", "CD8"))
 strand_job_wait(job)
 spe <- strand_download_results(job)

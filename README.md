@@ -39,9 +39,33 @@ cat("Used", result$credits_used, "credits;",
     length(result$marker_outputs), "markers written\n")
 ```
 
-Everything else — uploads, model selection, async jobs, OME-TIFF export,
-error handling — is covered in the
-[hosted docs](https://docs.strandai.com/sdks/r).
+Use the unified sample surface to browse owned and public slides, inspect an
+owned slide's job history, and update its attributes:
+
+```r
+page <- strand_samples_list(client, scope = "all")
+sample <- strand_samples_get(client, page$items[[1]]$id)
+
+if (sample$ownership == "mine") {
+  sample <- strand_patch_sample(
+    client, sample$id,
+    name = "Baseline biopsy",
+    tags = c("baseline", "responding"),
+    mpp = 0.26
+  )
+}
+```
+
+Price a prediction through the same operation that submits it:
+
+```r
+estimate <- strand_predict(
+  client, upload$id, c("CD8", "PanCK"), dry_run = TRUE
+)
+```
+
+Uploads, model selection, async jobs, OME-TIFF export, and error handling are
+covered in the [hosted docs](https://docs.strandai.com/sdks/r).
 
 ## Issues & support
 

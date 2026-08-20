@@ -18,7 +18,7 @@ names), and \code{public_markers} (the subset that is part of the public panel).
 List the markers your account can request, scoped to your entitlement: a
 self-signup account sees the public panel; a full-panel account sees the
 whole vocabulary. Credit-free. The names returned are exactly what
-\code{\link[=strand_predict]{strand_predict()}} and \code{\link[=strand_estimate]{strand_estimate()}} will accept.
+\code{\link[=strand_predict]{strand_predict()}} accepts in both submit and dry-run modes.
 }
 \examples{
 \dontrun{

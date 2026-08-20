@@ -14,8 +14,8 @@ The updated job status list with \code{status = "cancelled"}.
 }
 \description{
 Calls \code{POST /api/v1/jobs/{id}/cancel}, then fetches and returns the updated
-job status. Cancellation refunds the reserved credits. The server returns 400
-if the job is already terminal.
+job status. Cancellation refunds the reserved credits. The server returns
+400 if the job is already terminal.
 }
 \examples{
 \dontrun{

@@ -38,24 +38,46 @@ client
 
 ## 2. Upload a slide
 
-`strand_upload_file()` handles the resumable upload flow end-to-end: it
-initiates a session, streams the file to GCS in 8 MiB chunks, and finalizes
-once all bytes are written. Slide dimensions are read on finalize and used to
-estimate credits.
+`strand_upload_file()` initiates a resumable session and streams the file to
+GCS in 8 MiB chunks. The final PUT triggers automatic ingest, and the function
+polls only until the upload status leaves `uploading`. Dimensions can remain
+unavailable while preprocessing continues; estimation reports when the sample
+is ready.
 
 ```{r}
 upload <- strand_upload_file(client, "slide.svs", progress = TRUE)
 upload
 ```
 
-## 3. Estimate credits
+## 3. Work with samples
 
-Estimation is free — call it as many times as you like while iterating on a
-marker panel.
+`strand_samples_list()` lists owned samples, the public cohort, or both.
+Every item has an `ownership` discriminator and a canonical `id` accepted by
+`strand_samples_get()`. Owned detail includes recent inference jobs; public
+detail contains public geometry and marker channels without job history.
+
+```{r}
+page <- strand_samples_list(client, scope = "all")
+sample <- strand_samples_get(client, page$items[[1]]$id)
+
+if (sample$ownership == "mine") {
+  sample <- strand_patch_sample(
+    client, sample$id,
+    name = "Baseline biopsy",
+    tags = c("baseline", "responding"),
+    mpp = 0.26
+  )
+}
+```
+
+## 4. Price credits
+
+A dry run performs the same validation and pricing as submission without
+reserving credits or creating a job.
 
 ```{r}
 markers <- c("CD3", "CD8", "Ki67", "PD-L1")
-est <- strand_estimate(client, upload$id, markers)
+est <- strand_predict(client, upload$id, markers, dry_run = TRUE)
 message(
   est$patch_count, " patches x ", est$marker_count, " markers = ",
   est$estimated_credits, " credits"
@@ -63,7 +85,7 @@ message(
 message("org balance: ", est$org_balance)
 ```
 
-## 4. Submit and wait
+## 5. Submit and wait
 
 Submission **atomically reserves** the estimated credits in the same database
 transaction that creates the job. If your org has insufficient credits, you'll
@@ -99,7 +121,7 @@ status <- strand_job_wait(job)
 spe <- strand_download_results(job)
 ```
 
-## 5. Download as SpatialExperiment
+## 6. Download as SpatialExperiment
 
 `strand_download_results()` walks the OME-Zarr result store via the
 API-key-authenticated proxy and assembles the channels into a

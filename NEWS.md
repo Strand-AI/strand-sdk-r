@@ -1,3 +1,23 @@
+# strandai 0.9.0
+
+## Breaking
+
+* `strand_samples_list(scope = "mine" | "public" | "all")` is the single
+  cursor-paginated sample collection. It replaces
+  `strand_public_samples_list()` and uses canonical `id` plus a mandatory
+  `ownership` discriminator for both owned and public records.
+* `strand_samples_get()` now resolves owned sample ids and public share ids.
+  Owned records include the 50 newest inference jobs and the uncapped
+  `job_count`; public records never include job history.
+* `strand_patch_sample()` replaces `strand_set_mpp()` and updates any
+  combination of display name, complete tag set, and isotropic MPP. `NULL`
+  omits a field, `clear_name = TRUE` sends an explicit JSON null, and
+  `tags = character(0)` clears user-editable tags.
+* `strand_predict(dry_run = TRUE)` prices a run without reserving credits or
+  creating a job. It replaces `strand_estimate()`.
+* `strand_public_samples_list()`, `strand_public_sample_get()`,
+  `strand_set_mpp()`, and `strand_estimate()` are removed without aliases.
+
 # strandai 0.8.0
 
 ## Added

@@ -1,15 +1,15 @@
 # Marker catalog. Mirrors GET /api/v1/markers.
 #
 # The entitlement-scoped set of markers the account may request. Credit-free.
-# The returned names are exactly what strand_predict()/strand_estimate() will
-# accept, so use this to discover valid marker names upfront.
+# The returned names are exactly what strand_predict() accepts in submit and
+# dry-run modes, so use this to discover valid marker names upfront.
 
 #' List available markers
 #'
 #' List the markers your account can request, scoped to your entitlement: a
 #' self-signup account sees the public panel; a full-panel account sees the
 #' whole vocabulary. Credit-free. The names returned are exactly what
-#' [strand_predict()] and [strand_estimate()] will accept.
+#' [strand_predict()] accepts in both submit and dry-run modes.
 #'
 #' @param client A `strand_client` from [strand_client()].
 #'

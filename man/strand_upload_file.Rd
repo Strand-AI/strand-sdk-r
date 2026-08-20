@@ -10,7 +10,8 @@ strand_upload_file(
   content_type = NULL,
   chunk_size = 8L * 1024L * 1024L,
   progress = FALSE,
-  auto_segment = NULL
+  auto_segment = NULL,
+  mpp = NULL
 )
 }
 \arguments{
@@ -29,22 +30,26 @@ strand_upload_file(
 \code{NULL} (default) uses the org's default; \code{FALSE} skips segmentation (the
 slide is still ingested and rendered); \code{TRUE} forces it on even when the
 org default is off.}
+
+\item{mpp}{Optional user-reported microns per pixel, persisted when the upload
+is created. Must be greater than 0 and at most 100. This creation-time value
+takes precedence over embedded slide calibration.}
 }
 \value{
 A list with class \code{strand_upload} containing \code{id}, \code{gcs_path},
 \code{upload_url}, \code{width_px}, \code{height_px}, \code{status}.
 }
 \description{
-Performs the three-step resumable upload flow:
+Performs the event-driven resumable upload flow:
 \enumerate{
 \item \code{POST /api/v1/uploads} — create a resumable session
 \item \verb{PUT <uploadUrl>} — stream the file to GCS in 8 MiB chunks
-\item \code{POST /api/v1/uploads/{id}/complete} — finalize, read slide dims
+\item Poll \code{GET /api/v1/uploads/{id}} until GCS OBJECT_FINALIZE starts ingest
 }
 }
 \examples{
 \dontrun{
 client <- strand_client()
-upload <- strand_upload_file(client, "slide.svs", progress = TRUE)
+upload <- strand_upload_file(client, "slide.svs", progress = TRUE, mpp = 0.26)
 }
 }

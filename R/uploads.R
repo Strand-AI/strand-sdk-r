@@ -2,11 +2,11 @@
 
 #' Upload a Whole Slide Image to the Strand AI Platform
 #'
-#' Performs the three-step resumable upload flow:
+#' Performs the event-driven resumable upload flow:
 #' \enumerate{
 #'   \item `POST /api/v1/uploads` — create a resumable session
 #'   \item `PUT <uploadUrl>` — stream the file to GCS in 8 MiB chunks
-#'   \item `POST /api/v1/uploads/{id}/complete` — finalize, read slide dims
+#'   \item Poll `GET /api/v1/uploads/{id}` until GCS OBJECT_FINALIZE starts ingest
 #' }
 #'
 #' @param client A `strand_client` from [strand_client()].
@@ -19,6 +19,9 @@
 #'   `NULL` (default) uses the org's default; `FALSE` skips segmentation (the
 #'   slide is still ingested and rendered); `TRUE` forces it on even when the
 #'   org default is off.
+#' @param mpp Optional user-reported microns per pixel, persisted when the upload
+#'   is created. Must be greater than 0 and at most 100. This creation-time value
+#'   takes precedence over embedded slide calibration.
 #'
 #' @return A list with class `strand_upload` containing `id`, `gcs_path`,
 #'   `upload_url`, `width_px`, `height_px`, `status`.
@@ -26,14 +29,15 @@
 #' @examples
 #' \dontrun{
 #' client <- strand_client()
-#' upload <- strand_upload_file(client, "slide.svs", progress = TRUE)
+#' upload <- strand_upload_file(client, "slide.svs", progress = TRUE, mpp = 0.26)
 #' }
 #' @export
 strand_upload_file <- function(client, path,
                                content_type = NULL,
                                chunk_size = 8L * 1024L * 1024L,
                                progress = FALSE,
-                               auto_segment = NULL) {
+                               auto_segment = NULL,
+                               mpp = NULL) {
   if (!inherits(client, "strand_client")) {
     stop("client must be a strand_client (see strand_client())", call. = FALSE)
   }
@@ -55,6 +59,7 @@ strand_upload_file <- function(client, path,
 
   init_body <- list(filename = filename, fileSize = size, contentType = ct)
   if (!is.null(auto_segment)) init_body$autoSegment <- auto_segment
+  if (!is.null(mpp)) init_body$mpp <- strand_validate_mpp(mpp, "mpp")
 
   session <- strand_perform_json(
     client, "uploads", method = "POST",
@@ -64,22 +69,40 @@ strand_upload_file <- function(client, path,
   strand_stream_to_gcs(session$uploadUrl, path, size, ct,
                         chunk_size = chunk_size, progress = progress)
 
-  completion <- strand_perform_json(
-    client, sprintf("uploads/%s/complete", session$uploadId),
-    method = "POST"
-  )
+  upload <- strand_wait_for_ingest_start(client, session$uploadId)
+  upload$upload_url <- session$uploadUrl
+  upload$gcs_path <- session$gcsPath
+  upload
+}
 
-  structure(
-    list(
-      id = session$uploadId,
-      gcs_path = session$gcsPath,
-      upload_url = session$uploadUrl,
-      width_px = completion$widthPx,
-      height_px = completion$heightPx,
-      status = completion$status
-    ),
-    class = "strand_upload"
-  )
+# Wait for the authenticated OBJECT_FINALIZE push to move the row out of the
+# client-owned `uploading` state. The GCS PUT is complete at this point; this
+# bounded poll only bridges Pub/Sub delivery latency so immediate predict calls
+# cannot race the ingest transition.
+strand_wait_for_ingest_start <- function(client, upload_id,
+                                         timeout_sec = 120,
+                                         poll_interval_sec = 0.5) {
+  deadline <- Sys.time() + timeout_sec
+  repeat {
+    upload <- strand_parse_upload_row(
+      strand_perform_json(client, sprintf("uploads/%s", upload_id))
+    )
+    if (identical(upload$status, "upload_failed")) {
+      stop(
+        "GCS finalized an object whose size did not match the declared upload; ",
+        "create a new upload session and send the complete file.",
+        call. = FALSE
+      )
+    }
+    if (!identical(upload$status, "uploading")) return(upload)
+    if (Sys.time() >= deadline) {
+      stop(
+        "The upload reached GCS, but automatic ingest did not start within 120 seconds.",
+        call. = FALSE
+      )
+    }
+    Sys.sleep(poll_interval_sec)
+  }
 }
 
 #' @export

@@ -8,6 +8,22 @@ UPLOAD_ID <- "11111111-1111-1111-1111-111111111111"
 RESULT_BASE <- "predictions/org/33333333"
 
 
+add_ready_upload_route <- function(app) {
+  app$get("/api/v1/uploads/:id", function(req, res) {
+    res$set_status(200L)$send_json(list(
+      id = UPLOAD_ID,
+      filename = "slide.svs",
+      fileSize = "1048576",
+      status = "ready",
+      gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID),
+      createdAt = "2026-08-19T18:00:00Z",
+      widthPx = 1024L,
+      heightPx = 1024L
+    ), auto_unbox = TRUE)
+  })
+}
+
+
 array_meta <- function(shape, chunk, dtype = "float32") {
   list(
     zarr_format = 3L,
@@ -93,19 +109,8 @@ build_pipeline_app <- function(markers) {
     res$set_status(if (is_final) 200L else 308L)$send("")
   })
 
-  # 3) Complete upload.
-  app$post("/api/v1/uploads/:id/complete", function(req, res) {
-    res$set_status(200L)$send_json(
-      list(
-        uploadId = UPLOAD_ID,
-        status = "ready",
-        widthPx = 1024L,
-        heightPx = 1024L,
-        dimensionsSource = "sharp"
-      ),
-      auto_unbox = TRUE
-    )
-  })
+  # 3) Automatic OBJECT_FINALIZE ingest has started.
+  add_ready_upload_route(app)
 
   # 4) Submit predict.
   app$post("/api/v1/predict", function(req, res) {
@@ -309,12 +314,7 @@ test_that("strand_run attaches upload_id to errors raised after upload", {
     is_final <- !is.na(end_byte) && !is.na(end_total) && end_total == (end_byte + 1L)
     res$set_status(if (is_final) 200L else 308L)$send("")
   })
-  app$post("/api/v1/uploads/:id/complete", function(req, res) {
-    res$set_status(200L)$send_json(list(
-      uploadId = UPLOAD_ID, status = "ready",
-      widthPx = 1024L, heightPx = 1024L
-    ), auto_unbox = TRUE)
-  })
+  add_ready_upload_route(app)
   app$post("/api/v1/predict", function(req, res) {
     res$set_status(400L)$send_json(list(
       error = "unknown_markers",
@@ -386,12 +386,7 @@ test_that("strand_run with wait=FALSE returns the job after upload+submit only",
     is_final <- !is.na(end_byte) && !is.na(end_total) && end_total == (end_byte + 1L)
     res$set_status(if (is_final) 200L else 308L)$send("")
   })
-  app$post("/api/v1/uploads/:id/complete", function(req, res) {
-    res$set_status(200L)$send_json(list(
-      uploadId = UPLOAD_ID, status = "ready",
-      widthPx = 1024L, heightPx = 1024L
-    ), auto_unbox = TRUE)
-  })
+  add_ready_upload_route(app)
   app$post("/api/v1/predict", function(req, res) {
     res$set_status(202L)$send_json(
       list(jobId = JOB_ID, reservedCredits = 42L, status = "queued"),
@@ -458,12 +453,7 @@ test_that("strand_run forwards model on the submit body", {
     is_final <- !is.na(end_byte) && !is.na(end_total) && end_total == (end_byte + 1L)
     res$set_status(if (is_final) 200L else 308L)$send("")
   })
-  app$post("/api/v1/uploads/:id/complete", function(req, res) {
-    res$set_status(200L)$send_json(list(
-      uploadId = UPLOAD_ID, status = "ready",
-      widthPx = 1024L, heightPx = 1024L
-    ), auto_unbox = TRUE)
-  })
+  add_ready_upload_route(app)
   app$post("/api/v1/predict", function(req, res) {
     sentinel <- if (identical(req$json$model, "v0.5")) 222L else 0L
     res$set_status(202L)$send_json(

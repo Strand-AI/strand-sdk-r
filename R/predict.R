@@ -1,4 +1,4 @@
-# Predict surface — estimate + submit.
+# Prediction pricing and submission.
 
 # Canonical SDK-routable Lattice versions. Mirrors `POSTMAN_VERSIONS` in
 # `platform/src/lib/inference/postman-versions.ts` — the SDK can't import
@@ -23,31 +23,9 @@ strand_validate_model <- function(model) {
   model
 }
 
-#' Estimate credit cost for a prediction
-#'
-#' Calls `POST /api/v1/predict/estimate` to compute the credit cost for a
-#' given upload + marker selection. Does not reserve credits.
-#'
-#' @param client A `strand_client`.
-#' @param upload_id Upload identifier (from [strand_upload_file()]).
-#' @param markers Character vector of marker names (e.g. `c("CD3", "CD8")`).
-#'
-#' @return A list with `patch_count`, `marker_count`, `estimated_credits`,
-#'   `org_balance`, `org_pending`.
-#'
-#' @examples
-#' \dontrun{
-#' est <- strand_estimate(client, upload$id, c("CD3", "CD8", "Ki67"))
-#' message("≈ ", est$estimated_credits, " credits")
-#' }
-#' @export
-strand_estimate <- function(client, upload_id, markers) {
-  markers <- strand_coerce_markers(markers)
-  raw <- strand_perform_json(
-    client, "predict/estimate", method = "POST",
-    body = list(uploadId = upload_id, markers = markers)
-  )
+strand_parse_estimate <- function(raw) {
   list(
+    dry_run = TRUE,
     patch_count = raw$patchCount,
     marker_count = raw$markerCount,
     estimated_credits = raw$estimatedCredits,
@@ -56,41 +34,61 @@ strand_estimate <- function(client, upload_id, markers) {
   )
 }
 
-#' Submit a prediction job
+#' Price or submit a prediction
 #'
-#' Calls `POST /api/v1/predict`. Atomically reserves credits in the same
-#' transaction; on insufficient balance raises a `strand_insufficient_credits_error`
-#' condition with a `required` field.
+#' Calls `POST /api/v1/predict`. The default mode atomically reserves credits
+#' and creates a job. With `dry_run = TRUE`, the same marker, model, and sample
+#' validation runs without reserving credits or creating a job.
 #'
-#' @inheritParams strand_estimate
+#' @param client A `strand_client`.
+#' @param upload_id Upload identifier (from [strand_upload_file()]).
+#' @param markers Character vector of marker names (e.g. `c("CD3", "CD8")`).
 #' @param model Optional explicit Lattice version. `"v0.7"` is the current
 #'   dispatchable version and default. `"v0.4"` and `"v0.5"` remain recognized
 #'   identifiers for historical records, but requesting either for a new job
 #'   returns 400 `model_sunset`. When `NULL` (default), the platform picks
 #'   `"v0.7"`.
+#' @param dry_run When `TRUE`, price the request without reserving credits or
+#'   creating a job. Must be one non-missing logical value.
 #'
-#' @return A `strand_job` list with `id`, `reserved_credits`, `client`.
+#' @return With `dry_run = FALSE`, a `strand_job` list with `id`,
+#'   `reserved_credits`, and `client`. With `dry_run = TRUE`, a list with
+#'   `dry_run = TRUE`, `patch_count`, `marker_count`, `estimated_credits`,
+#'   `org_balance`, and `org_pending`.
 #'
 #' @examples
 #' \dontrun{
+#' estimate <- strand_predict(
+#'   client, upload$id, c("CD3", "CD8"), dry_run = TRUE
+#' )
+#' message("approximately ", estimate$estimated_credits, " credits")
+#'
 #' job <- strand_predict(client, upload$id, c("CD3", "CD8"))
 #' strand_job_wait(job)
 #'
-#' # Explicitly target a specific version:
 #' job <- strand_predict(client, upload$id, c("CD3", "CD8"),
 #'                       model = "v0.7")
 #' }
 #' @export
-strand_predict <- function(client, upload_id, markers, model = NULL) {
+strand_predict <- function(client, upload_id, markers, model = NULL,
+                           dry_run = FALSE) {
   markers <- strand_coerce_markers(markers)
   model <- strand_validate_model(model)
-  body <- list(uploadId = upload_id, markers = markers)
+  if (!is.logical(dry_run) || length(dry_run) != 1L || is.na(dry_run)) {
+    stop("dry_run must be TRUE or FALSE", call. = FALSE)
+  }
+
+  body <- list(uploadId = upload_id, markers = I(markers))
   if (!is.null(model)) body$model <- model
+  if (isTRUE(dry_run)) body$dryRun <- TRUE
+
   raw <- strand_perform_json(
     client, "predict", method = "POST",
     body = body,
-    expected = 202L
+    expected = if (isTRUE(dry_run)) 200L else 202L
   )
+  if (isTRUE(dry_run)) return(strand_parse_estimate(raw))
+
   structure(
     list(
       id = raw$jobId,
