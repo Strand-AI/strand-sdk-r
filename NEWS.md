@@ -1,3 +1,14 @@
+# strandai (development version)
+
+## Breaking
+
+* Added `strand_export_request()`, `strand_export_get()`, and
+  `strand_export_download()` as the one format-driven OME-Zarr/ZIP/TIFF
+  surface, with optional H&E and segmentation manifests.
+* Added segmentation status, start/retry, and artifact-manifest functions.
+* Removed the format-specific OME-TIFF request/get/download functions without
+  aliases.
+
 # strandai 0.9.0
 
 ## Breaking
