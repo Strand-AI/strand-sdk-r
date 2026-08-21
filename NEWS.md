@@ -1,4 +1,4 @@
-# strandai (development version)
+# strandai 0.10.0
 
 ## Breaking
 
