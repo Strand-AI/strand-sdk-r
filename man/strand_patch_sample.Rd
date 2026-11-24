@@ -8,7 +8,7 @@ strand_patch_sample(
   client,
   sample_id,
   name = NULL,
-  tags = NULL,
+  fields = NULL,
   mpp = NULL,
   clear_name = FALSE
 )
@@ -20,8 +20,8 @@ strand_patch_sample(
 
 \item{name}{New display name, or \code{NULL} to leave it unchanged.}
 
-\item{tags}{Character vector containing the complete desired tag set,
-\code{character(0)} to clear it, or \code{NULL} to leave it unchanged.}
+\item{fields}{Named list of complete field values keyed by stable key, or
+\code{NULL} to leave every field unchanged.}
 
 \item{mpp}{Isotropic microns per pixel, greater than 0 and at most 100, or
 \code{NULL} to leave it unchanged.}
@@ -34,16 +34,16 @@ The refreshed owned sample record, including \code{jobs} and \code{job_count};
 see \code{\link[=strand_samples_get]{strand_samples_get()}}.
 }
 \description{
-Updates any combination of display name, complete user-editable tag set,
-and physical pixel size in one request. \code{NULL} arguments are omitted.
-Use \code{clear_name = TRUE} to send JSON \code{null} and restore the filename as the
-display name. Passing \code{tags = character(0)} clears all user-editable tags.
+Updates any combination of display name, unified field values, and physical
+pixel size in one request. \code{NULL} arguments are omitted. Use
+\code{clear_name = TRUE} to send JSON \code{null} and restore the filename. Field
+values are keyed by stable key; \code{fields = list(tags = list())} clears Tags.
 }
 \examples{
 \dontrun{
 strand_patch_sample(client, sample_id, name = "Baseline biopsy")
-strand_patch_sample(client, sample_id, tags = c("baseline", "responding"))
-strand_patch_sample(client, sample_id, tags = character(0), mpp = 0.26)
+strand_patch_sample(client, sample_id, fields = list(tags = c("baseline", "responding")))
+strand_patch_sample(client, sample_id, fields = list(tags = list()), mpp = 0.26)
 strand_patch_sample(client, sample_id, clear_name = TRUE)
 }
 }

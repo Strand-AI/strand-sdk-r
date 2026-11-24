@@ -42,7 +42,7 @@ strand_parse_estimate <- function(raw) {
 #'
 #' @param client A `strand_client`.
 #' @param upload_id Upload identifier (from [strand_upload_file()]).
-#' @param markers Character vector of marker names (e.g. `c("CD3", "CD8")`).
+#' @param markers Character vector of marker names (e.g. `c("CD3e", "CD4")`).
 #' @param model Optional explicit Lattice version. `"v0.7"` is the current
 #'   dispatchable version and default. `"v0.4"` and `"v0.5"` remain recognized
 #'   identifiers for historical records, but requesting either for a new job
@@ -59,14 +59,14 @@ strand_parse_estimate <- function(raw) {
 #' @examples
 #' \dontrun{
 #' estimate <- strand_predict(
-#'   client, upload$id, c("CD3", "CD8"), dry_run = TRUE
+#'   client, upload$id, c("CD3e", "CD4"), dry_run = TRUE
 #' )
 #' message("approximately ", estimate$estimated_credits, " credits")
 #'
-#' job <- strand_predict(client, upload$id, c("CD3", "CD8"))
+#' job <- strand_predict(client, upload$id, c("CD3e", "CD4"))
 #' strand_job_wait(job)
 #'
-#' job <- strand_predict(client, upload$id, c("CD3", "CD8"),
+#' job <- strand_predict(client, upload$id, c("CD3e", "CD4"),
 #'                       model = "v0.7")
 #' }
 #' @export
@@ -125,7 +125,7 @@ strand_coerce_markers <- function(markers) {
 #' @param client A `strand_client`.
 #' @param image_path Path to a local WSI file (SVS / TIFF / NDPI / ...).
 #' @param markers Character vector of markers to predict (e.g.
-#'   `c("HER2", "CD8", "PD1")`).
+#'   `c("PanCK", "CD4", "CD45")`).
 #' @param model Optional explicit model id; see [strand_predict()]. Defaults
 #'   to `NULL` (platform picks).
 #' @param wait When `TRUE` (default), block through upload → submit → wait →
@@ -159,22 +159,22 @@ strand_coerce_markers <- function(markers) {
 #' client <- strand_client()
 #' result <- strand_run(
 #'   client, "biopsy.ome.tiff",
-#'   markers = c("HER2", "CD8", "PD1"),
+#'   markers = c("PanCK", "CD4", "CD45"),
 #'   output_dir = "./outputs/"
 #' )
 #' cat("used", result$credits_used, "credits\n")
 #'
 #' # Choose a version explicitly:
-#' result <- strand_run(client, "biopsy.ome.tiff", c("CD8", "Ki67"),
+#' result <- strand_run(client, "biopsy.ome.tiff", markers = c("CD4", "Ki67"),
 #'                      model = "v0.7")
 #'
 #' # Fire-and-forget — upload + submit only, then drive the job later:
-#' job <- strand_run(client, "biopsy.ome.tiff", c("CD8"), wait = FALSE)
+#' job <- strand_run(client, "biopsy.ome.tiff", markers = c("CD4"), wait = FALSE)
 #' status <- strand_job_wait(job)
 #' spe <- strand_download_results(job)
 #'
 #' # The S3 generic also works: predict(client, ...)
-#' result <- predict(client, "biopsy.ome.tiff", markers = c("HER2"))
+#' result <- predict(client, "biopsy.ome.tiff", markers = c("CD45"))
 #' }
 #' @export
 strand_run <- function(client, image_path, markers,

@@ -37,15 +37,19 @@ takes precedence over embedded slide calibration.}
 }
 \value{
 A list with class \code{strand_upload} containing \code{id}, \code{gcs_path},
-\code{upload_url}, \code{width_px}, \code{height_px}, \code{status}.
+\code{upload_url}, \code{upload_transport}, \code{width_px}, \code{height_px}, \code{status}.
 }
 \description{
-Performs the event-driven resumable upload flow:
+Follows the explicit server-selected upload transport:
 \enumerate{
-\item \code{POST /api/v1/uploads} — create a resumable session
-\item \verb{PUT <uploadUrl>} — stream the file to GCS in 8 MiB chunks
-\item Poll \code{GET /api/v1/uploads/{id}} until GCS OBJECT_FINALIZE starts ingest
+\item \code{POST /api/v1/uploads} — create a session with \code{uploadTransport}
+\item Transfer GCS resumable chunks, a small S3 single PUT, or bounded SHA256 S3 multipart parts
+\item S3 automatically calls owned completion to start durable ingestion; GCS uses object-finalize
 }
+Both backends support the 50 GiB application cap. S3 multipart automatically
+renews owned part URLs and completes the verified manifest. Permanent single
+PUT also uses owned completion; no Content-Range
+or API credentials are sent to S3.
 }
 \examples{
 \dontrun{

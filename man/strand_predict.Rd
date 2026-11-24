@@ -11,7 +11,7 @@ strand_predict(client, upload_id, markers, model = NULL, dry_run = FALSE)
 
 \item{upload_id}{Upload identifier (from \code{\link[=strand_upload_file]{strand_upload_file()}}).}
 
-\item{markers}{Character vector of marker names (e.g. \code{c("CD3", "CD8")}).}
+\item{markers}{Character vector of marker names (e.g. \code{c("CD3e", "CD4")}).}
 
 \item{model}{Optional explicit Lattice version. \code{"v0.7"} is the current
 dispatchable version and default. \code{"v0.4"} and \code{"v0.5"} remain recognized
@@ -36,14 +36,14 @@ validation runs without reserving credits or creating a job.
 \examples{
 \dontrun{
 estimate <- strand_predict(
-  client, upload$id, c("CD3", "CD8"), dry_run = TRUE
+  client, upload$id, c("CD3e", "CD4"), dry_run = TRUE
 )
 message("approximately ", estimate$estimated_credits, " credits")
 
-job <- strand_predict(client, upload$id, c("CD3", "CD8"))
+job <- strand_predict(client, upload$id, c("CD3e", "CD4"))
 strand_job_wait(job)
 
-job <- strand_predict(client, upload$id, c("CD3", "CD8"),
+job <- strand_predict(client, upload$id, c("CD3e", "CD4"),
                       model = "v0.7")
 }
 }

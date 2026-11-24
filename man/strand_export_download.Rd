@@ -8,6 +8,7 @@ strand_export_download(
   job,
   format,
   path,
+  include_he = FALSE,
   include_segmentation = FALSE,
   timeout = Inf,
   poll_interval = 2
@@ -16,9 +17,11 @@ strand_export_download(
 \arguments{
 \item{job}{A \code{strand_job}.}
 
-\item{format}{One of \code{"ome-zarr"}, \code{"ome-zarr-zip"}, or \code{"ome-tiff"}.}
+\item{format}{One of \code{"ome-zarr-zip"} or \code{"ome-tiff"}.}
 
 \item{path}{Destination file.}
+
+\item{include_he}{Include processed/registered H&E.}
 
 \item{include_segmentation}{Attach the latest segmentation artifact manifest.}
 

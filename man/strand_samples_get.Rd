@@ -16,8 +16,8 @@ For an owned sample, a named list with \code{ownership = "mine"}, sample
 identity and lifecycle fields, \code{jobs}, and \code{job_count}. Each job contains
 \code{id}, \code{status}, \code{progress}, \code{reserved_credits}, \code{markers}, timestamps,
 \code{error_message}, and \code{results_available}. For a public sample, a named list
-with \code{ownership = "public"}, canonical share \code{id}, \code{title}, \code{tags}, public
-\code{metadata}, \code{geometry}, \code{markers}, \code{thumbnail_url}, and \code{pyramid_url}.
+with \code{ownership = "public"}, canonical share \code{id}, \code{title},
+\code{geometry}, \code{markers}, \code{thumbnail_url}, and \code{pyramid_url}.
 }
 \description{
 Fetches either an owned sample by sample id or a public sample by share id.

@@ -14,20 +14,28 @@ strand_check_job <- function(job) {
 #'
 #' @param job A `strand_job`.
 #' @param format One of `"ome-zarr"`, `"ome-zarr-zip"`, or `"ome-tiff"`.
-#' @param include_he Include source H&E. OME-TIFF always includes H&E.
+#' @param include_he Include processed/registered H&E. Defaults to `FALSE` for every format.
 #' @param include_segmentation Attach the latest segmentation artifact manifest.
+#' @param include_original_upload Request the separate, potentially multi-GB source file stored by
+#'   Strand, not processed/registered H&E. If ingest de-identification ran, this is the stored
+#'   de-identified copy. Defaults to `FALSE`.
 #' @return A result export manifest.
 #' @export
 strand_export_request <- function(job, format,
-                                  include_he = NULL,
-                                  include_segmentation = FALSE) {
+                                  include_he = FALSE,
+                                  include_segmentation = FALSE,
+                                  include_original_upload = FALSE) {
   strand_check_job(job)
   formats <- c("ome-zarr", "ome-zarr-zip", "ome-tiff")
   if (!is.character(format) || length(format) != 1L || !(format %in% formats)) {
     stop("format must be one of: ome-zarr, ome-zarr-zip, ome-tiff", call. = FALSE)
   }
-  body <- list(format = format, includeSegmentation = include_segmentation)
-  if (!is.null(include_he)) body$includeHe <- include_he
+  body <- list(
+    format = format,
+    includeHe = include_he,
+    includeSegmentation = include_segmentation,
+    includeOriginalUpload = include_original_upload
+  )
   strand_perform_json(
     job$client,
     sprintf("jobs/%s/exports", job$id),
@@ -43,14 +51,16 @@ strand_export_request <- function(job, format,
 #' @return A refreshed result export manifest.
 #' @export
 strand_export_get <- function(job, format,
-                              include_he = NULL,
-                              include_segmentation = FALSE) {
+                              include_he = FALSE,
+                              include_segmentation = FALSE,
+                              include_original_upload = FALSE) {
   strand_check_job(job)
   query <- list(
     format = format,
-    includeSegmentation = tolower(as.character(include_segmentation))
+    includeHe = tolower(as.character(include_he)),
+    includeSegmentation = tolower(as.character(include_segmentation)),
+    includeOriginalUpload = tolower(as.character(include_original_upload))
   )
-  if (!is.null(include_he)) query$includeHe <- tolower(as.character(include_he))
   strand_perform_json(
     job$client,
     sprintf("jobs/%s/exports", job$id),
@@ -61,13 +71,17 @@ strand_export_get <- function(job, format,
 
 #' Download a generated result export
 #'
-#' @inheritParams strand_export_request
+#' @param job A `strand_job`.
+#' @param format One of `"ome-zarr-zip"` or `"ome-tiff"`.
+#' @param include_he Include processed/registered H&E.
+#' @param include_segmentation Attach the latest segmentation artifact manifest.
 #' @param path Destination file.
 #' @param timeout Maximum seconds to wait; `Inf` waits indefinitely.
 #' @param poll_interval Seconds between status requests.
 #' @return Normalized destination path, invisibly.
 #' @export
 strand_export_download <- function(job, format, path,
+                                   include_he = FALSE,
                                    include_segmentation = FALSE,
                                    timeout = Inf, poll_interval = 2) {
   if (!(format %in% c("ome-zarr-zip", "ome-tiff"))) {
@@ -75,7 +89,7 @@ strand_export_download <- function(job, format, path,
   }
   export <- strand_export_request(
     job, format,
-    include_he = if (identical(format, "ome-tiff")) TRUE else NULL,
+    include_he = include_he,
     include_segmentation = include_segmentation
   )
   deadline <- if (is.finite(timeout)) Sys.time() + timeout else NA
@@ -89,7 +103,7 @@ strand_export_download <- function(job, format, path,
     Sys.sleep(poll_interval)
     export <- strand_export_get(
       job, format,
-      include_he = if (identical(format, "ome-tiff")) TRUE else NULL,
+      include_he = include_he,
       include_segmentation = include_segmentation
     )
   }

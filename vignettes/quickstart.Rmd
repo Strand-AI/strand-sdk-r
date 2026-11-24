@@ -40,13 +40,48 @@ client
 
 `strand_upload_file()` initiates a resumable session and streams the file to
 GCS in 8 MiB chunks. The final PUT triggers automatic ingest, and the function
-polls only until the upload status leaves `uploading`. Dimensions can remain
-unavailable while preprocessing continues; estimation reports when the sample
-is ready.
+polls only until the upload status leaves `uploading`. Poll the owned sample
+until ingest has resolved prediction-ready dimensions and scale before pricing.
 
 ```{r}
 upload <- strand_upload_file(client, "slide.svs", progress = TRUE)
 upload
+
+deadline <- Sys.time() + 10 * 60
+poll_seconds <- 2
+repeat {
+  uploaded_sample <- strand_samples_get(client, upload$id)
+  if (!identical(uploaded_sample$ownership, "mine")) {
+    stop("uploaded sample resolved as ", uploaded_sample$ownership)
+  }
+  if (identical(uploaded_sample$status, "ready")) {
+    geometry <- c(
+      uploaded_sample$width_px,
+      uploaded_sample$height_px,
+      uploaded_sample$mpp
+    )
+    if (length(geometry) != 3L || any(!is.finite(geometry)) || any(geometry <= 0)) {
+      stop("sample is ready but lacks prediction dimensions or MPP")
+    }
+    break
+  }
+  if (grepl("failed$", uploaded_sample$status)) {
+    stop("ingest failed: ", uploaded_sample$status)
+  }
+  if (!uploaded_sample$status %in% c("uploading", "preprocessing")) {
+    stop("unexpected ingest status: ", uploaded_sample$status)
+  }
+  if (Sys.time() >= deadline) {
+    stop("sample was not prediction-ready after 10 minutes: ", uploaded_sample$status)
+  }
+  Sys.sleep(poll_seconds)
+  poll_seconds <- min(poll_seconds * 1.5, 15)
+}
+
+message(
+  "slide metadata ready: ", uploaded_sample$width_px, "x", uploaded_sample$height_px,
+  " at ", uploaded_sample$mpp, " um/px"
+)
 ```
 
 ## 3. Work with samples
@@ -64,7 +99,7 @@ if (sample$ownership == "mine") {
   sample <- strand_patch_sample(
     client, sample$id,
     name = "Baseline biopsy",
-    tags = c("baseline", "responding"),
+    fields = list(tags = c("baseline", "responding")),
     mpp = 0.26
   )
 }
@@ -72,14 +107,33 @@ if (sample$ownership == "mine") {
 
 ## 4. Price credits
 
-A dry run performs the same validation and pricing as submission without
-reserving credits or creating a job.
+Tissue-tile counting can finish after the sample metadata becomes ready. Retry
+the side-effect-free dry run only on its exact `sample_not_ready` response. A
+successful dry run is the final prediction-readiness check.
 
 ```{r}
-markers <- c("CD3", "CD8", "Ki67", "PD-L1")
-est <- strand_predict(client, upload$id, markers, dry_run = TRUE)
+markers <- c("CD3e", "CD4", "Ki67", "CD45")
+deadline <- Sys.time() + 10 * 60
+poll_seconds <- 2
+repeat {
+  est <- tryCatch(
+    strand_predict(client, upload$id, markers, dry_run = TRUE),
+    strand_api_error = function(e) e
+  )
+  if (!inherits(est, "strand_api_error")) break
+  if (!identical(est$status_code, 409L) ||
+      !identical(est$error_code, "sample_not_ready")) {
+    stop(est)
+  }
+  if (Sys.time() >= deadline) {
+    stop("sample was not priceable after 10 minutes")
+  }
+  Sys.sleep(poll_seconds)
+  poll_seconds <- min(poll_seconds * 1.5, 15)
+}
+
 message(
-  est$patch_count, " patches x ", est$marker_count, " markers = ",
+  est$patch_count, " retained tissue positions x ", est$marker_count, " markers = ",
   est$estimated_credits, " credits"
 )
 message("org balance: ", est$org_balance)

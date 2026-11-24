@@ -50,7 +50,7 @@ strand_parse_job <- function(raw) {
 #'
 #' @examples
 #' \dontrun{
-#' job <- strand_predict(client, upload$id, c("CD3", "CD8"))
+#' job <- strand_predict(client, upload$id, c("CD3e", "CD4"))
 #' status <- strand_job_cancel(job)
 #' }
 #' @export

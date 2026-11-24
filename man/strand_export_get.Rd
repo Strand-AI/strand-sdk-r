@@ -4,16 +4,26 @@
 \alias{strand_export_get}
 \title{Get format-driven result export status}
 \usage{
-strand_export_get(job, format, include_he = NULL, include_segmentation = FALSE)
+strand_export_get(
+  job,
+  format,
+  include_he = FALSE,
+  include_segmentation = FALSE,
+  include_original_upload = FALSE
+)
 }
 \arguments{
 \item{job}{A \code{strand_job}.}
 
 \item{format}{One of \code{"ome-zarr"}, \code{"ome-zarr-zip"}, or \code{"ome-tiff"}.}
 
-\item{include_he}{Include source H&E. OME-TIFF always includes H&E.}
+\item{include_he}{Include processed/registered H&E. Defaults to \code{FALSE} for every format.}
 
 \item{include_segmentation}{Attach the latest segmentation artifact manifest.}
+
+\item{include_original_upload}{Request the separate, potentially multi-GB source file stored by
+Strand, not processed/registered H&E. If ingest de-identification ran, this is the stored
+de-identified copy. Defaults to \code{FALSE}.}
 }
 \value{
 A refreshed result export manifest.

@@ -18,7 +18,12 @@ strand_perform_json <- function(client, path, method = "GET",
   req <- strand_req(client, path)
   req <- httr2::req_method(req, method)
   if (!is.null(query) && length(query) > 0L) {
-    req <- do.call(httr2::req_url_query, c(list(.req = req), query))
+    # Repeatable filter facets (status, marker, field, ...) arrive as vectors and
+    # must serialize as one occurrence per value, matching the API's contract.
+    req <- do.call(
+      httr2::req_url_query,
+      c(list(.req = req), query, list(.multi = "explode"))
+    )
   }
   if (!is.null(body)) {
     req <- httr2::req_body_json(req, body, auto_unbox = TRUE)

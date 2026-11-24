@@ -1,9 +1,9 @@
 # strandai
 
-R client for the [Strand AI Platform](https://strandai.com): upload H&E
-whole-slide images, run virtual multiplex-immunofluorescence inference
-(H&E → spatial proteomics), and download per-marker predictions as a
-`SpatialExperiment` or OME-Zarr/OME-TIFF. Functions use the `strand_*`
+R client for [Lattice spatial proteomics from H&E](https://strandai.com/lattice).
+Upload H&E whole-slide images, predict spatially resolved protein-marker maps,
+and download the virtual mIF channels as a `SpatialExperiment` or
+OME-Zarr/OME-TIFF. Functions use the `strand_*`
 prefix; the package is named `strandai` to avoid a clash with the unrelated
 [`strand`](https://cran.r-project.org/package=strand) package on CRAN.
 
@@ -32,7 +32,7 @@ client <- strand_client()  # reads STRAND_API_KEY
 
 result <- strand_run(
   client, "biopsy.ome.tiff",
-  markers = c("HER2", "CD8", "PD1"),
+  markers = c("PanCK", "CD4", "CD45"),
   output_dir = "./outputs/"
 )
 cat("Used", result$credits_used, "credits;",
@@ -50,7 +50,7 @@ if (sample$ownership == "mine") {
   sample <- strand_patch_sample(
     client, sample$id,
     name = "Baseline biopsy",
-    tags = c("baseline", "responding"),
+    fields = list(tags = c("baseline", "responding")),
     mpp = 0.26
   )
 }
@@ -60,7 +60,7 @@ Price a prediction through the same operation that submits it:
 
 ```r
 estimate <- strand_predict(
-  client, upload$id, c("CD8", "PanCK"), dry_run = TRUE
+  client, upload$id, c("CD4", "PanCK"), dry_run = TRUE
 )
 ```
 

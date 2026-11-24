@@ -4,7 +4,12 @@
 \alias{strand_results_to_spatial_experiment}
 \title{Build a \code{SpatialExperiment} from a \verb{[C, H, W]} array}
 \usage{
-strand_results_to_spatial_experiment(array, markers, base_path = NA_character_)
+strand_results_to_spatial_experiment(
+  array,
+  markers,
+  base_path = NA_character_,
+  marker_frame = NULL
+)
 }
 \arguments{
 \item{array}{3-D array \verb{[C, H, W]}.}
@@ -12,6 +17,8 @@ strand_results_to_spatial_experiment(array, markers, base_path = NA_character_)
 \item{markers}{Character vector of marker / channel names; length equals C.}
 
 \item{base_path}{Optional GCS path; stored in \code{metadata(spe)$strand$base_path}.}
+
+\item{marker_frame}{Optional persisted model-native marker transform.}
 }
 \value{
 A \code{SpatialExperiment} with \code{assay = "expression"} and pixel coords

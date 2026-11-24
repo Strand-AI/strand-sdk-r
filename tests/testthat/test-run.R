@@ -73,14 +73,18 @@ root_meta <- function(markers) {
 
 # Builds a webfakes app that fakes the full pipeline. Markers must match what
 # the test will request so the mock zarr layout lines up.
-build_pipeline_app <- function(markers) {
+build_pipeline_app <- function(markers, transport = "gcs_resumable", reject_completion = FALSE,
+                               completion_generation = "fixture-version") {
   app <- webfakes::new_app()
 
   # The GCS resumable PUT URL — point it back at our mock host so the chunked
   # PUT goes here too. We register the path lazily once the server is up.
   app$locals <- list(
     upload_url = NULL,
-    markers = markers
+    markers = markers,
+    parts = list(),
+    completed = FALSE,
+    multipart_size = NULL
   )
 
   # 1) Initiate upload — return uploadUrl pointing at our own server.
@@ -89,18 +93,32 @@ build_pipeline_app <- function(markers) {
     host <- req$get_header("host")
     upload_url <- sprintf("http://%s/_gcs/resumable?upload_id=abc", host)
     app$locals$upload_url <- upload_url
+    if (identical(transport, "s3_multipart")) {
+      body <- jsonlite::fromJSON(rawToChar(req$.body), simplifyVector = FALSE)
+      app$locals$multipart_size <- body$fileSize
+      return(res$set_status(200L)$send_json(list(uploadId = UPLOAD_ID,
+        uploadUrl = NULL, uploadTransport = transport, gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID),
+        multipart = list(partSizeBytes = 8L * 1024L * 1024L, partCount = 2L, checksumAlgorithm = "SHA256")), auto_unbox = TRUE))
+    }
     res$set_status(200L)$send_json(
       list(
         uploadId = UPLOAD_ID,
-        uploadUrl = upload_url,
+        uploadUrl = upload_url, uploadTransport = transport,
         gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID)
       ),
       auto_unbox = TRUE
     )
   })
 
-  # 2) Chunked PUT to GCS — accept any chunk, return 200 for final, 308 mid.
+  # 2) The same real HTTP fixture checks the selected transfer protocol.
   app$put("/_gcs/resumable", function(req, res) {
+    if (identical(transport, "s3_presigned_put")) {
+      stopifnot(is.null(req$get_header("content-range")))
+      stopifnot(is.null(req$get_header("authorization")))
+      stopifnot(is.null(req$get_header("transfer-encoding")))
+      stopifnot(as.numeric(req$get_header("content-length")) == 10L * 1024L * 1024L)
+      return(res$set_status(200L)$send(""))
+    }
     rng <- req$get_header("content-range") %||% ""
     parts <- strsplit(rng, "[/-]")[[1]]
     end_byte <- as.integer(parts[2])
@@ -109,7 +127,44 @@ build_pipeline_app <- function(markers) {
     res$set_status(if (is_final) 200L else 308L)$send("")
   })
 
-  # 3) Automatic OBJECT_FINALIZE ingest has started.
+  app$post("/api/v1/uploads/:id", function(req, res) {
+    stopifnot(identical(transport, "s3_multipart"), !is.null(req$get_header("authorization")))
+    body <- jsonlite::fromJSON(rawToChar(req$.body), simplifyVector = FALSE)
+    requested <- body$parts[[1]]
+    number <- requested$partNumber
+    expected_size <- if (number == 1L) 8L * 1024L * 1024L else app$locals$multipart_size - 8L * 1024L * 1024L
+    res$set_status(200L)$send_json(list(uploadId = UPLOAD_ID, uploadUrl = NULL,
+      uploadTransport = transport, gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID),
+      multipart = list(partSizeBytes = 8L * 1024L * 1024L, partCount = 2L, checksumAlgorithm = "SHA256"),
+      parts = list(list(partNumber = number, uploadUrl = sprintf("http://%s/_s3/parts/%s", req$get_header("host"), number),
+        headers = list(`Content-Length` = sprintf("%.0f", expected_size), `x-amz-checksum-sha256` = requested$checksumSha256))),
+      uploadedParts = list()), auto_unbox = TRUE)
+  })
+  app$put("/_s3/parts/:number", function(req, res) {
+    number <- as.integer(req$params$number)
+    bytes <- req$.body
+    expected_size <- if (number == 1L) 8L * 1024L * 1024L else app$locals$multipart_size - 8L * 1024L * 1024L
+    stopifnot(number %in% c(1L, 2L), length(bytes) == expected_size,
+      is.null(req$get_header("authorization")), is.null(req$get_header("content-range")),
+      identical(req$get_header("content-length"), sprintf("%.0f", expected_size)))
+    checksum <- openssl::base64_encode(openssl::sha256(bytes))
+    stopifnot(identical(req$get_header("x-amz-checksum-sha256"), checksum))
+    etag <- sprintf('"part-%s"', number)
+    app$locals$parts[[number]] <- list(partNumber = number, etag = etag, checksumSha256 = checksum)
+    res$set_status(200L)$set_header("ETag", etag)$send("")
+  })
+  # S3 uses the owned completion API; GCS retains OBJECT_FINALIZE.
+  app$post("/api/v1/uploads/:id/complete", function(req, res) {
+    stopifnot(!is.null(req$get_header("authorization")))
+    if (identical(transport, "s3_multipart")) {
+      body <- jsonlite::fromJSON(rawToChar(req$.body), simplifyVector = FALSE)
+      stopifnot(identical(body$parts, app$locals$parts), length(body$parts) == 2L)
+      if (reject_completion) return(res$set_status(409L)$send_json(list(error = "completion_not_accepted")))
+      app$locals$completed <- TRUE
+    } else stopifnot(identical(transport, "s3_presigned_put"))
+    res$set_status(200L)$send_json(list(uploadId = UPLOAD_ID, generation = completion_generation), auto_unbox = TRUE)
+  })
+  # 3) Normal ingestion has started.
   add_ready_upload_route(app)
 
   # 4) Submit predict.
@@ -201,6 +256,61 @@ make_slide_file <- function(dir, bytes = 256L * 1024L) {
   path
 }
 
+
+test_that("S3 transport streams the whole file without resumable or API headers", {
+  skip_if_no_webfakes()
+  server <- start_strand_server(build_pipeline_app("DAPI", transport = "s3_presigned_put"))
+  client <- testing_client(server)
+  slide <- make_slide_file(withr::local_tempdir(), bytes = 10L * 1024L * 1024L)
+  uploaded <- strand_upload_file(client, slide, chunk_size = 256L * 1024L)
+  expect_identical(uploaded$id, UPLOAD_ID)
+  expect_identical(uploaded$upload_transport, "s3_presigned_put")
+})
+
+
+test_that("public R multipart upload sends two checked parts then authenticated completion", {
+  skip_if_no_webfakes()
+  server <- start_strand_server(build_pipeline_app("DAPI", transport = "s3_multipart"))
+  client <- testing_client(server)
+  slide <- make_slide_file(withr::local_tempdir(), bytes = 12L * 1024L * 1024L)
+  output <- capture.output(uploaded <- strand_upload_file(client, slide, progress = TRUE))
+  expect_identical(uploaded$id, UPLOAD_ID)
+  expect_identical(uploaded$upload_transport, "s3_multipart")
+  expect_true(any(grepl("12582912 / 12582912", output, fixed = TRUE)))
+})
+
+test_that("R multipart does not report final progress before accepted owned completion", {
+  skip_if_no_webfakes()
+  server <- start_strand_server(build_pipeline_app("DAPI", transport = "s3_multipart", reject_completion = TRUE))
+  client <- testing_client(server)
+  slide <- make_slide_file(withr::local_tempdir(), bytes = 12L * 1024L * 1024L)
+  output <- capture.output(expect_error(strand_upload_file(client, slide, progress = TRUE)))
+  expect_false(any(grepl("12582912 / 12582912", output, fixed = TRUE)))
+})
+
+test_that("R completion version requires one nonmissing nonempty character value", {
+  for (value in list(NULL, "", NA_character_, "null", 7, c("one", "two"))) {
+    expect_false(strand_valid_completion_generation(value))
+  }
+  expect_true(strand_valid_completion_generation("recorded-version"))
+})
+
+test_that("R AWS completion rejects blank numeric and null-string versions before final progress", {
+  skip_if_no_webfakes()
+  for (transport in c("s3_presigned_put", "s3_multipart")) {
+    for (generation in list("", 7, "null")) {
+      server <- start_strand_server(build_pipeline_app("DAPI", transport = transport,
+                                    completion_generation = generation))
+      client <- testing_client(server)
+      bytes <- if (transport == "s3_multipart") 12L * 1024L * 1024L else 10L * 1024L * 1024L
+      slide <- make_slide_file(withr::local_tempdir(), bytes = bytes)
+      output <- capture.output(expect_error(strand_upload_file(client, slide, progress = TRUE),
+                                           "completion is unverified"))
+      final <- sprintf("%s / %s", sprintf("%.0f", bytes), sprintf("%.0f", bytes))
+      expect_false(any(grepl(final, output, fixed = TRUE)))
+    }
+  }
+})
 
 test_that("strand_run runs the full pipeline and writes the zarr store", {
   skip_if_no_webfakes()
@@ -302,7 +412,7 @@ test_that("strand_run attaches upload_id to errors raised after upload", {
     host <- req$get_header("host")
     res$set_status(200L)$send_json(list(
       uploadId = UPLOAD_ID,
-      uploadUrl = sprintf("http://%s/_gcs/resumable?upload_id=abc", host),
+      uploadUrl = sprintf("http://%s/_gcs/resumable?upload_id=abc", host), uploadTransport = "gcs_resumable",
       gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID)
     ), auto_unbox = TRUE)
   })
@@ -374,7 +484,7 @@ test_that("strand_run with wait=FALSE returns the job after upload+submit only",
     host <- req$get_header("host")
     res$set_status(200L)$send_json(list(
       uploadId = UPLOAD_ID,
-      uploadUrl = sprintf("http://%s/_gcs/resumable?upload_id=abc", host),
+      uploadUrl = sprintf("http://%s/_gcs/resumable?upload_id=abc", host), uploadTransport = "gcs_resumable",
       gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID)
     ), auto_unbox = TRUE)
   })
@@ -441,7 +551,7 @@ test_that("strand_run forwards model on the submit body", {
     host <- req$get_header("host")
     res$set_status(200L)$send_json(list(
       uploadId = UPLOAD_ID,
-      uploadUrl = sprintf("http://%s/_gcs/resumable?upload_id=abc", host),
+      uploadUrl = sprintf("http://%s/_gcs/resumable?upload_id=abc", host), uploadTransport = "gcs_resumable",
       gcsPath = sprintf("uploads/org/%s/slide.svs", UPLOAD_ID)
     ), auto_unbox = TRUE)
   })

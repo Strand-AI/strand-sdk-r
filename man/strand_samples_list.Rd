@@ -9,7 +9,13 @@ strand_samples_list(
   scope = "mine",
   limit = 48L,
   cursor = NULL,
-  tag = NULL
+  q = NULL,
+  status = NULL,
+  uploaded_from = NULL,
+  uploaded_to = NULL,
+  workflow = NULL,
+  marker = NULL,
+  field = NULL
 )
 }
 \arguments{
@@ -24,23 +30,56 @@ matched.}
 \item{cursor}{Opaque cursor returned as \code{next_cursor} by the previous call,
 or \code{NULL} for the first page.}
 
-\item{tag}{Optional exact tag filter.}
+\item{q}{Optional case-insensitive substring match on name or filename.}
+
+\item{status}{Optional lifecycle statuses: any of \code{"ready"},
+\code{"preprocessing"}, \code{"uploading"}, \code{"upload_failed"},
+\code{"preprocess_failed"}.}
+
+\item{uploaded_from, uploaded_to}{Optional inclusive upload-date bounds, as
+\code{Date} values or \code{YYYY-MM-DD} strings.}
+
+\item{workflow}{Optional job states: any of \code{"ready_no_job"},
+\code{"in_flight"}, \code{"has_results"}.}
+
+\item{marker}{Optional marker-state clauses from \code{\link[=strand_marker_filter]{strand_marker_filter()}},
+singly or as a list.}
+
+\item{field}{Optional custom-field clauses from \code{\link[=strand_field_filter]{strand_field_filter()}},
+singly or as a list.}
 }
 \value{
-A named list with \code{items} and \code{next_cursor}. Every item has
-\code{ownership} and canonical \code{id}. Owned items also have \code{name}, \code{filename},
-\code{status}, numeric \code{file_size}, \code{tags}, and \code{created_at}. Public items also
-have \code{title}, \code{thumbnail_url}, \code{tags}, and public \code{metadata}.
+A named list with \code{items}, \code{next_cursor}, and canonical \code{app_url}.
+Every item has \code{ownership}, canonical \code{id}, and its own \code{app_url}. Owned
+items also have \code{name}, \code{filename},
+\code{status}, numeric \code{file_size}, \code{fields}, and \code{created_at}. Public items also
+have \code{title} and \code{thumbnail_url}.
 }
 \description{
 Lists owned samples, Strand's public cohort, or both through one
 cursor-paginated collection. Public and owned records use distinct shapes;
 inspect each item's mandatory \code{ownership} field before using branch fields.
 }
+\details{
+The filter facets are the same ones the Strand web app puts in a \verb{/samples}
+URL, so a link and an API call describe the same set. Facets narrow
+together; \code{status} and \code{workflow} values widen (OR) while repeated \code{marker}
+and \code{field} clauses narrow (AND). Tags are a normal field clause bound to
+the predefined Tags definition id. Public releases support \code{q} title search
+only. Under \code{scope = "all"}, every non-\code{q} facet suppresses the public block
+while still filtering owned samples.
+Under \code{scope = "public"}, those facets are rejected as unanswerable.
+}
 \examples{
 \dontrun{
 client <- strand_client()
-page <- strand_samples_list(client, scope = "public", tag = "tcga-coad")
+page <- strand_samples_list(client, scope = "public", q = "TCGA-COAD")
 ids <- vapply(page$items, function(sample) sample$id, character(1))
+
+ready <- strand_samples_list(
+  client,
+  status = "ready",
+  marker = strand_marker_filter("CD20")
+)
 }
 }

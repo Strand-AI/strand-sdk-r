@@ -7,6 +7,9 @@ test_that("strand_results_to_array reads a marker array via the proxy", {
     node_type = "group",
     attributes = list(
       ome = list(version = "0.5"),
+      strand = list(markerFrame = list(
+        version = "model-native-dyadic-output-1p05/v1", k = 1L
+      )),
       multiscales = list(
         list(name = "H&E", datasets = list(list(path = "he/0"))),
         list(name = "CD3", datasets = list(list(path = "markers/CD3/0")))
@@ -57,4 +60,6 @@ test_that("strand_results_to_array reads a marker array via the proxy", {
   expect_equal(dim(res$array), c(1L, 2L, 2L))
   expect_equal(res$array[1, 1, 1], 1)
   expect_equal(res$array[1, 2, 2], 4)
+  expect_equal(res$marker_frame$version, "model-native-dyadic-output-1p05/v1")
+  expect_equal(res$marker_frame$k, 1L)
 })

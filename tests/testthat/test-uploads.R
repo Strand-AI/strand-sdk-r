@@ -1,5 +1,10 @@
 # Tests for strand_uploads_list() / strand_uploads_get().
 
+test_that("Content-Length stays decimal for large file and chunk sizes", {
+  expect_identical(vapply(c(10 * 1024^2, 1e9, 5e9), strand_content_length, character(1)),
+                   c("10485760", "1000000000", "5000000000"))
+})
+
 test_that("strand_uploads_list parses uploads and next_cursor", {
   skip_if_no_webfakes()
   app <- webfakes::new_app()
@@ -145,7 +150,7 @@ test_that("strand_upload_file forwards creation-time options on the init body", 
       args <- list(...)
       if (identical(path, "uploads")) {
         captured$body <- args$body
-        return(list(uploadId = "u-1", uploadUrl = "http://x/gcs", gcsPath = "p"))
+        return(list(uploadId = "u-1", uploadUrl = "http://x/gcs", uploadTransport = "gcs_resumable", gcsPath = "p"))
       }
       list(
         id = "u-1", filename = basename(f), fileSize = "1024",

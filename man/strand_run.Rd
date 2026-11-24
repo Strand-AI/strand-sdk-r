@@ -23,7 +23,7 @@ strand_run(
 \item{image_path}{Path to a local WSI file (SVS / TIFF / NDPI / ...).}
 
 \item{markers}{Character vector of markers to predict (e.g.
-\code{c("HER2", "CD8", "PD1")}).}
+\code{c("PanCK", "CD4", "CD45")}).}
 
 \item{model}{Optional explicit model id; see \code{\link[=strand_predict]{strand_predict()}}. Defaults
 to \code{NULL} (platform picks).}
@@ -75,21 +75,21 @@ need finer control.
 client <- strand_client()
 result <- strand_run(
   client, "biopsy.ome.tiff",
-  markers = c("HER2", "CD8", "PD1"),
+  markers = c("PanCK", "CD4", "CD45"),
   output_dir = "./outputs/"
 )
 cat("used", result$credits_used, "credits\n")
 
 # Choose a version explicitly:
-result <- strand_run(client, "biopsy.ome.tiff", c("CD8", "Ki67"),
+result <- strand_run(client, "biopsy.ome.tiff", markers = c("CD4", "Ki67"),
                      model = "v0.7")
 
 # Fire-and-forget — upload + submit only, then drive the job later:
-job <- strand_run(client, "biopsy.ome.tiff", c("CD8"), wait = FALSE)
+job <- strand_run(client, "biopsy.ome.tiff", markers = c("CD4"), wait = FALSE)
 status <- strand_job_wait(job)
 spe <- strand_download_results(job)
 
 # The S3 generic also works: predict(client, ...)
-result <- predict(client, "biopsy.ome.tiff", markers = c("HER2"))
+result <- predict(client, "biopsy.ome.tiff", markers = c("CD45"))
 }
 }

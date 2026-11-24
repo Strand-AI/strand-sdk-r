@@ -34,7 +34,7 @@
 #'
 #' @examples
 #' \dontrun{
-#' job <- strand_predict(client, upload$id, c("CD3", "CD8"))
+#' job <- strand_predict(client, upload$id, c("CD3e", "CD4"))
 #' strand_job_wait(job)
 #' spe <- strand_download_results(job)
 #' }
@@ -91,17 +91,19 @@ strand_download_results <- function(job, path = NULL, level = 0L,
 
   strand_results_to_spatial_experiment(
     stack, markers,
-    base_path = meta$resultBasePath
+    base_path = meta$resultBasePath,
+    marker_frame = strand_marker_frame(root)
   )
 }
 
 #' Download a single multiscale as a raw `[C, H, W]` numeric array
 #'
 #' @inheritParams strand_download_results
-#' @param name Name of the multiscale to read (e.g. `"CD3"`). When omitted,
+#' @param name Name of the multiscale to read (e.g. `"CD3e"`). When omitted,
 #'   defaults to the first marker multiscale (excluding H&E).
 #' @param root_meta Optional pre-fetched root group metadata (internal use).
-#' @return A list with `array` (3-D `[C, H, W]`) and `meta` (parsed zarr.json).
+#' @return A list with `array` (3-D `[C, H, W]`), `meta` (parsed zarr.json),
+#'   and `marker_frame` (the persisted transform, or `NULL` for legacy results).
 #' @export
 strand_results_to_array <- function(job, name = NULL, level = 0L,
                                     root_meta = NULL) {
@@ -120,7 +122,8 @@ strand_results_to_array <- function(job, name = NULL, level = 0L,
   arr <- strand_decode_array(array_meta, function(chunk_key) {
     strand_get_raw(job, sprintf("%s/%s", path, chunk_key))
   })
-  list(array = arr, meta = array_meta)
+  list(array = arr, meta = array_meta,
+       marker_frame = strand_marker_frame(root_meta))
 }
 
 #' Build a `SpatialExperiment` from a `[C, H, W]` array
@@ -128,11 +131,13 @@ strand_results_to_array <- function(job, name = NULL, level = 0L,
 #' @param array 3-D array `[C, H, W]`.
 #' @param markers Character vector of marker / channel names; length equals C.
 #' @param base_path Optional GCS path; stored in `metadata(spe)$strand$base_path`.
+#' @param marker_frame Optional persisted model-native marker transform.
 #' @return A `SpatialExperiment` with `assay = "expression"` and pixel coords
 #'   in `spatialCoords`.
 #' @export
 strand_results_to_spatial_experiment <- function(array, markers,
-                                                  base_path = NA_character_) {
+                                                  base_path = NA_character_,
+                                                  marker_frame = NULL) {
   if (!requireNamespace("SpatialExperiment", quietly = TRUE)) {
     stop("strand_download_results() requires the SpatialExperiment package. ",
          "Install with BiocManager::install('SpatialExperiment').",
@@ -154,11 +159,22 @@ strand_results_to_spatial_experiment <- function(array, markers,
     assays = list(expression = exprs),
     spatialCoords = spatial,
     metadata = list(strand = list(base_path = base_path,
-                                  shape_chw = c(c_dim, h_dim, w_dim)))
+                                  shape_chw = c(c_dim, h_dim, w_dim),
+                                  marker_frame = marker_frame))
   )
 }
 
 # ---------- internal helpers ----------
+
+strand_marker_frame <- function(root_meta) {
+  attrs <- root_meta$attributes %||% list()
+  frame <- (attrs$strand %||% list())$markerFrame
+  if (!is.null(frame)) return(frame)
+  for (multiscale in attrs$multiscales %||% list()) {
+    if (!is.null(multiscale$markerFrame)) return(multiscale$markerFrame)
+  }
+  NULL
+}
 
 strand_multiscale_names <- function(root_meta, include_he = FALSE) {
   attrs <- root_meta$attributes

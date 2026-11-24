@@ -1,3 +1,24 @@
+# strandai (development version)
+
+# strandai 0.11.0
+
+Unreleased candidate; native provider validation remains a release gate.
+
+## Changed
+
+* Uploads follow the explicit provider-directed resumable/single-PUT/multipart
+  contract, with owned renewal and completion. This is source capability, not
+  a claim of native large-slide qualification.
+
+* Sample reads expose one `fields` list keyed by stable definition key.
+  Top-level `tags` is removed; Tags is at `fields$tags` on owned records.
+  Public records expose neither Tags nor the organization's field vocabulary.
+* `strand_patch_sample()` accepts `fields = list(...)`; each supplied value is
+  complete, not a delta. The retired `tags` argument is removed.
+* `strand_samples_list()` filters Tags through `strand_field_filter()` using
+  the predefined Tags definition. The retired `tag` argument is removed.
+* Field discovery reports origin, storage, and writability.
+
 # strandai 0.10.0
 
 ## Breaking

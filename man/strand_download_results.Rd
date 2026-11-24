@@ -35,7 +35,7 @@ selectively with \code{Rarr}.
 }
 \examples{
 \dontrun{
-job <- strand_predict(client, upload$id, c("CD3", "CD8"))
+job <- strand_predict(client, upload$id, c("CD3e", "CD4"))
 strand_job_wait(job)
 spe <- strand_download_results(job)
 }

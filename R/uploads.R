@@ -1,13 +1,17 @@
-# Resumable upload of a WSI file.
+# Server-selected direct upload of a WSI file.
 
 #' Upload a Whole Slide Image to the Strand AI Platform
 #'
-#' Performs the event-driven resumable upload flow:
+#' Follows the explicit server-selected upload transport:
 #' \enumerate{
-#'   \item `POST /api/v1/uploads` — create a resumable session
-#'   \item `PUT <uploadUrl>` — stream the file to GCS in 8 MiB chunks
-#'   \item Poll `GET /api/v1/uploads/{id}` until GCS OBJECT_FINALIZE starts ingest
+#'   \item `POST /api/v1/uploads` — create a session with `uploadTransport`
+#'   \item Transfer GCS resumable chunks, a small S3 single PUT, or bounded SHA256 S3 multipart parts
+#'   \item S3 automatically calls owned completion to start durable ingestion; GCS uses object-finalize
 #' }
+#' Both backends support the 50 GiB application cap. S3 multipart automatically
+#' renews owned part URLs and completes the verified manifest. Permanent single
+#' PUT also uses owned completion; no Content-Range
+#' or API credentials are sent to S3.
 #'
 #' @param client A `strand_client` from [strand_client()].
 #' @param path Path to a local file (SVS / TIFF / NDPI / ...).
@@ -24,7 +28,7 @@
 #'   takes precedence over embedded slide calibration.
 #'
 #' @return A list with class `strand_upload` containing `id`, `gcs_path`,
-#'   `upload_url`, `width_px`, `height_px`, `status`.
+#'   `upload_url`, `upload_transport`, `width_px`, `height_px`, `status`.
 #'
 #' @examples
 #' \dontrun{
@@ -66,19 +70,30 @@ strand_upload_file <- function(client, path,
     body = init_body
   )
 
-  strand_stream_to_gcs(session$uploadUrl, path, size, ct,
-                        chunk_size = chunk_size, progress = progress)
+  if (identical(session$uploadTransport, "gcs_resumable")) {
+    strand_stream_to_gcs(session$uploadUrl, path, size, ct,
+                         chunk_size = chunk_size, progress = progress)
+  } else if (identical(session$uploadTransport, "s3_presigned_put")) {
+    strand_stream_to_s3(session$uploadUrl, path, size, ct, progress = FALSE)
+    completed <- strand_perform_json(client, sprintf("uploads/%s/complete", session$uploadId), method = "POST")
+    if (!identical(completed$uploadId, session$uploadId) || !strand_valid_completion_generation(completed$generation)) stop("Owned upload completion is unverified", call. = FALSE)
+    if (isTRUE(progress)) cat(sprintf("Uploaded %s / %s bytes\\n", strand_content_length(size), strand_content_length(size)))
+  } else if (identical(session$uploadTransport, "s3_multipart")) {
+    strand_stream_multipart(client, session, path, size, progress)
+  } else {
+    stop("Upload session requires an explicit supported uploadTransport.", call. = FALSE)
+  }
 
   upload <- strand_wait_for_ingest_start(client, session$uploadId)
   upload$upload_url <- session$uploadUrl
+  upload$upload_transport <- session$uploadTransport
   upload$gcs_path <- session$gcsPath
   upload
 }
 
-# Wait for the authenticated OBJECT_FINALIZE push to move the row out of the
-# client-owned `uploading` state. The GCS PUT is complete at this point; this
-# bounded poll only bridges Pub/Sub delivery latency so immediate predict calls
-# cannot race the ingest transition.
+# Wait for object-finalize delivery to move the row out of client-owned
+# `uploading` after the storage PUT completes. This bounded poll prevents
+# immediate predict calls from racing the ingest transition.
 strand_wait_for_ingest_start <- function(client, upload_id,
                                          timeout_sec = 120,
                                          poll_interval_sec = 0.5) {
@@ -89,7 +104,7 @@ strand_wait_for_ingest_start <- function(client, upload_id,
     )
     if (identical(upload$status, "upload_failed")) {
       stop(
-        "GCS finalized an object whose size did not match the declared upload; ",
+        "Storage finalized an object whose size did not match the declared upload; ",
         "create a new upload session and send the complete file.",
         call. = FALSE
       )
@@ -97,7 +112,7 @@ strand_wait_for_ingest_start <- function(client, upload_id,
     if (!identical(upload$status, "uploading")) return(upload)
     if (Sys.time() >= deadline) {
       stop(
-        "The upload reached GCS, but automatic ingest did not start within 120 seconds.",
+        "The object upload completed, but automatic ingest did not start within 120 seconds.",
         call. = FALSE
       )
     }
@@ -117,6 +132,79 @@ print.strand_upload <- function(x, ...) {
   invisible(x)
 }
 
+# HTTP Content-Length is decimal digits, never R's scientific notation.
+strand_content_length <- function(size) sprintf("%.0f", size)
+strand_valid_completion_generation <- function(value) {
+  is.character(value) && length(value) == 1L && !is.na(value) && nzchar(value) && value != "null"
+}
+
+strand_stream_multipart <- function(client, session, path, size, progress) {
+  geometry <- session$multipart
+  part_size <- geometry$partSizeBytes
+  count <- geometry$partCount
+  if (is.null(part_size) || !(part_size %in% c(8 * 1024^2, 64 * 1024^2)) ||
+      is.null(count) || count != ceiling(size / part_size) || count < 1 || count > 800 ||
+      !identical(geometry$checksumAlgorithm, "SHA256")) {
+    stop("Invalid server multipart geometry", call. = FALSE)
+  }
+  before <- file.info(path)
+  input <- file(path, "rb")
+  on.exit(close(input), add = TRUE)
+  manifest <- vector("list", count)
+  sent <- 0
+  for (number in seq_len(count)) {
+    buf <- readBin(input, "raw", n = min(part_size, size - sent))
+    if (length(buf) != min(part_size, size - sent)) stop("Local multipart source changed", call. = FALSE)
+    checksum <- openssl::base64_encode(openssl::sha256(buf))
+    renewed <- strand_perform_json(client, sprintf("uploads/%s", session$uploadId), method = "POST",
+      body = list(parts = list(list(partNumber = number, checksumSha256 = checksum))))
+    if (!identical(renewed$uploadTransport, "s3_multipart") ||
+        !identical(renewed$multipart, geometry)) stop("Multipart authority changed", call. = FALSE)
+    existing <- Filter(function(p) p$partNumber == number, renewed$uploadedParts)
+    if (length(existing)) {
+      if (existing[[1]]$checksumSha256 != checksum || existing[[1]]$size != length(buf))
+        stop("Existing multipart part differs from local source", call. = FALSE)
+      etag <- existing[[1]]$etag
+    } else {
+      part <- renewed$parts[[1]]
+      if (length(renewed$parts) != 1L || part$partNumber != number ||
+          part$headers$`Content-Length` != strand_content_length(length(buf)) ||
+          part$headers$`x-amz-checksum-sha256` != checksum) stop("Invalid multipart part receipt", call. = FALSE)
+      req <- httr2::req_method(httr2::request(part$uploadUrl), "PUT")
+      req <- httr2::req_body_raw(req, buf)
+      req <- httr2::req_headers(req, `Content-Length` = strand_content_length(length(buf)),
+                                `x-amz-checksum-sha256` = checksum)
+      req <- httr2::req_error(req, is_error = function(resp) FALSE)
+      response <- httr2::req_perform(req)
+      etag <- httr2::resp_header(response, "etag")
+      if (httr2::resp_status(response) != 200L || is.null(etag)) stop("S3 multipart part rejected", call. = FALSE)
+    }
+    manifest[[number]] <- list(partNumber = number, etag = etag, checksumSha256 = checksum)
+    sent <- sent + length(buf)
+    after <- file.info(path)
+    if (before$size != after$size || before$mtime != after$mtime) stop("Local multipart source changed", call. = FALSE)
+    if (isTRUE(progress) && sent < size) cat(sprintf("\\rUploaded %s / %s bytes", strand_content_length(sent), strand_content_length(size)))
+  }
+  completed <- strand_perform_json(client, sprintf("uploads/%s/complete", session$uploadId),
+                                  method = "POST", body = list(parts = manifest))
+  if (!identical(completed$uploadId, session$uploadId) || !strand_valid_completion_generation(completed$generation))
+    stop("Multipart completion is unverified", call. = FALSE)
+  if (isTRUE(progress)) cat(sprintf("\\rUploaded %s / %s bytes\\n", strand_content_length(size), strand_content_length(size)))
+}
+
+# S3 PutObject is a single streamed request: no GCS Content-Range or API auth.
+strand_stream_to_s3 <- function(upload_url, path, size, content_type, progress) {
+  req <- httr2::request(upload_url)
+  req <- httr2::req_method(req, "PUT")
+  req <- httr2::req_body_file(req, path, type = content_type)
+  req <- httr2::req_headers(req, `Content-Length` = strand_content_length(size))
+  req <- httr2::req_error(req, is_error = function(resp) FALSE)
+  resp <- httr2::req_perform(req)
+  status <- httr2::resp_status(resp)
+  if (!(status %in% c(200L, 201L))) stop("S3 rejected object upload: HTTP ", status, call. = FALSE)
+  if (isTRUE(progress)) message(sprintf("  uploaded %.1f / %.1f MB (100%%)", size / 1e6, size / 1e6))
+}
+
 # Chunked PUT to the GCS resumable session URL.
 strand_stream_to_gcs <- function(upload_url, path, size, content_type,
                                   chunk_size, progress) {
@@ -133,7 +221,7 @@ strand_stream_to_gcs <- function(upload_url, path, size, content_type,
     req <- httr2::request(upload_url)
     req <- httr2::req_method(req, "PUT")
     req <- httr2::req_headers(req,
-                              `Content-Length` = as.character(length(buf)),
+                              `Content-Length` = strand_content_length(length(buf)),
                               `Content-Range` = range_hdr,
                               `Content-Type` = content_type)
     req <- httr2::req_body_raw(req, buf, type = content_type)

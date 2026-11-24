@@ -9,7 +9,7 @@ strand_results_to_array(job, name = NULL, level = 0L, root_meta = NULL)
 \arguments{
 \item{job}{A \code{strand_job} from \code{\link[=strand_predict]{strand_predict()}}.}
 
-\item{name}{Name of the multiscale to read (e.g. \code{"CD3"}). When omitted,
+\item{name}{Name of the multiscale to read (e.g. \code{"CD3e"}). When omitted,
 defaults to the first marker multiscale (excluding H&E).}
 
 \item{level}{Pyramid level to read; \code{0} is full resolution.}
@@ -17,7 +17,8 @@ defaults to the first marker multiscale (excluding H&E).}
 \item{root_meta}{Optional pre-fetched root group metadata (internal use).}
 }
 \value{
-A list with \code{array} (3-D \verb{[C, H, W]}) and \code{meta} (parsed zarr.json).
+A list with \code{array} (3-D \verb{[C, H, W]}), \code{meta} (parsed zarr.json),
+and \code{marker_frame} (the persisted transform, or \code{NULL} for legacy results).
 }
 \description{
 Download a single multiscale as a raw \verb{[C, H, W]} numeric array
